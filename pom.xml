@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 
+         https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>3.5.5</version>
+        <relativePath/> <!-- lookup parent from repository -->
+    </parent>
+
+    <groupId>com.gist</groupId>
+    <artifactId>idea-virtual-bar</artifactId>
+    <version>1.0.0</version>
+    <packaging>pom</packaging>
+
+    <name>IDEA - Virtual Bar (Parent)</name>
+    <description>Intent-Driven Event Architecture didactic project using LavinMQ and TypeSafe Config</description>
+
+    <properties>
+        <java.version>25</java.version>
+        <maven.compiler.source>25</maven.compiler.source>
+        <maven.compiler.target>25</maven.compiler.target>
+        <maven.compiler.release>25</maven.compiler.release>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        
+        <!-- Dipendenze esterne -->
+        <typesafe-config.version>1.4.3</typesafe-config.version>
+    </properties>
+
+    <!-- Moduli della molecola di microservizi -->
+    <modules>
+        <module>bar-common</module>
+        <module>bar-dispatcher</module>
+        <module>bar-counter</module>
+        <module>bar-kitchen</module>
+        <module>bar-desk</module>
+    </modules>
+
+    <!-- Dependency Management centralizzato -->
+    <dependencyManagement>
+        <dependencies>
+            <!-- Modulo comune interno -->
+            <dependency>
+                <groupId>com.gist</groupId>
+                <artifactId>bar-common</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+
+            <!-- TypeSafe Config (Rule engine per il Bar-Dispatcher) -->
+            <dependency>
+                <groupId>com.typesafe</groupId>
+                <artifactId>config</artifactId>
+                <version>${typesafe-config.version}</version>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
+    <!-- Dipendenze ereditate da tutti i sottomoduli -->
+    <dependencies>
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <pluginManagement>
+            <plugins>
+                <plugin>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-maven-plugin</artifactId>
+                    <configuration>
+                        <excludes>
+                            <exclude>
+                                <groupId>org.projectlombok</groupId>
+                                <artifactId>lombok</artifactId>
+                            </exclude>
+                        </excludes>
+                    </configuration>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-compiler-plugin</artifactId>
+                    <version>3.13.0</version>
+                    <configuration>
+                        <release>25</release>
+                    </configuration>
+                </plugin>
+            </plugins>
+        </pluginManagement>
+    </build>
+</project>
