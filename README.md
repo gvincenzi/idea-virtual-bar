@@ -15,7 +15,7 @@
 ## 📖 Architectural Background & Vision
 
 This project is a hands-on implementation of the architectural principles formulated by [Giuseppe Vincenzi](https://www.linkedin.com/in/giuseppevincenzi/) in:  
-👉 **[L’Architecture Intent-Driven : une molécule de microservices pilotée par le métier et les événements](https://www.linkedin.com/pulse/intent-driven-architecture-microservice-molecule-driven-vincenzi-jzdhe/)**
+👉 **[Intent-Driven Architecture: a microservice molecule driven by Business and Events](https://www.linkedin.com/pulse/intent-driven-architecture-microservice-molecule-driven-vincenzi-jzdhe/)**
 
 The **Intent-Driven Architecture** treats business intent as the primary entry point of a distributed software system, harmonizing **Domain-Driven Design (DDD)** and **Event-Driven Architecture (EDA)** across **three foundational pillars**:
 
