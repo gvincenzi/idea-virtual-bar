@@ -1,34 +1,48 @@
 # ☕ IDEA - Intent Driven Event Architecture (Virtual Bar)
+<img src="src/main/resources/static/images/logo.jpg" width="200">
 
 [![Java 25](https://img.shields.io/badge/Java-25-blue.svg)](https://openjdk.org/)
 [![Spring Boot 3.5.5](https://img.shields.io/badge/Spring%20Boot-3.5.5-brightgreen.svg)](https://spring.io/projects/spring-boot)
 [![AMQP 0-9-1](https://img.shields.io/badge/Broker-LavinMQ-orange.svg)](https://lavinmq.com/)
-[![Intent Classifier](https://img.shields.io/badge/TypeSafe%20AI-Choice%20Primitive-red.svg)](https://spring-ai-community.github.io/spring-ai-typesafe/latest/concepts/primitives/#choice)
+[![Intent Classifier](https://img.shields.io/badge/TypeSafe%20AI-Jev%20System%20One-red.svg)](https://api.typesafe.ai)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 > **"One microservice = One business intent"**  
-> Reference implementation project demonstrating the **Intent-Driven Event Architecture (IDEA)** pattern.
+> Reference implementation demonstrating the **Intent-Driven Event Architecture (IDEA)** pattern.
 
 ---
 
 ## 📖 Architectural Background & Vision
 
-This project serves as a hands-on didactic implementation of the principles introduced by [Giuseppe Vincenzi](https://www.linkedin.com/in/giuseppevincenzi/) in the article:  
+This project is a hands-on implementation of the architectural principles formulated by [Giuseppe Vincenzi](https://www.linkedin.com/in/giuseppevincenzi/) in:  
 👉 **[L’Architecture Intent-Driven : une molécule de microservices pilotée par le métier et les événements](https://www.linkedin.com/pulse/intent-driven-architecture-microservice-molecule-driven-vincenzi-jzdhe/)**
 
-The **Intent-Driven Architecture** paradigm posits business intent as the primary entry point of a distributed software system, blending the core strengths of **Domain-Driven Design (DDD)** and **Event-Driven Architecture (EDA)** across **three foundational pillars**:
+The **Intent-Driven Architecture** treats business intent as the primary entry point of a distributed software system, harmonizing **Domain-Driven Design (DDD)** and **Event-Driven Architecture (EDA)** across **three foundational pillars**:
 
-1. **The Asynchronous Intent Distributor (Spike / Alpha)**: A qualified single access gateway that ingests natural language requests, evaluates them via a type-safe classification engine (**TypeSafe Spring AI `Choice` primitive**), and dispatches discrete events to the message broker.
-2. **End-to-End Correlation ID**: Every incoming intent is minted with a unique correlation identifier that propagates across every downstream microservice and event payload.
-3. **Observability & Closed-Loop Feedback**: An aggregated read-model that listens to return events, providing continuous auditability and state verification for any given intent lifecycle.
+1. **The Asynchronous Intent Distributor (Spike / Alpha)**: A qualified single access gateway that ingests free-form natural language, classifies intents at ultra-low latency using **TypeSafe AI Jev (System One Model)** with speculative fan-out, and dispatches discrete events to the message broker.
+2. **End-to-End Correlation ID**: Every incoming intent lifecycle receives a unique correlation identifier that travels through every worker, topic, and return event.
+3. **Observability & Closed-Loop Feedback**: A dedicated read-model service (`Desk-Service`) that aggregates state across workers, providing continuous auditability and state verification.
 
 ---
 
 ## ☕ The Domain: Virtual Bar
 
-To keep the pattern intuitive and relatable, the architecture models a **Virtual Bar**, where responsibilities map cleanly to distinct business intents.
+The architecture models a **Virtual Bar** with a single universal entry point and specialized workers:
 
 ![IDEA - Virtual Bar Architecture Flow](src/main/resources/static/images/schema.png)
+
+### The Universal Entry Point (`POST /intent`)
+
+Clients interact exclusively through a single endpoint. Jev classifies the request into one or more business intents via speculative fan-out:
+
+| Business Intent (`IntentEnum`) | Target Worker | LavinMQ Routing Key | Behavior |
+|---|---|---|---|
+| **`ORDER_DRINK`** | `Counter-Service` | `intent.orderDrink` | Asynchronous (`202 Accepted`) |
+| **`ORDER_FOOD`** | `Kitchen-Service` | `intent.orderFood` | Asynchronous (`202 Accepted`) |
+| **`CHECK_STATUS`** | `Desk-Service` | `intent.checkStatus` | Synchronous bridge via Correlation ID |
+| **`PAY_BILL`** | `Desk-Service` | `intent.payBill` | Synchronous bridge via Correlation ID |
+
+> **Compound Intents Supported**: A sentence like *"I'd like a cappuccino and a croissant"* triggers both `ORDER_DRINK` and `ORDER_FOOD` in parallel under a **single Correlation ID**, dispatched across separate queues.
 
 ---
 
@@ -38,21 +52,22 @@ The repository is organized as a multi-module Maven project (`com.gist:idea-virt
 
 | Module | Architectural Role | Description |
 |---|---|---|
-| **`bar-common`** | **Contracts & Kernel** | Shared immutable Java records for domain events (`DomainEvent`) and AMQP definitions. |
-| **`bar-dispatcher`** | **The Spike (Alpha)** | The sole public entry point. Classifies intents via **TypeSafe Spring AI (`Choice`)**, assigns `correlationId`, and publishes to LavinMQ. |
+| **`bar-common`** | **Contracts & Kernel** | Shared immutable Java records for domain events (`DomainEvent`), `IntentEnum`, and AMQP topology definitions. |
+| **`bar-dispatcher`** | **The Spike (Alpha)** | The sole public entry point (`POST /intent`). Classifies intents via **TypeSafe AI Jev**, assigns `correlationId`, and publishes to LavinMQ. |
 | **`bar-counter`** | **Drink Worker** | Consumes `intent.orderDrink`, simulates preparation, and publishes `drinkReady`. |
 | **`bar-kitchen`** | **Food Worker** | Consumes `intent.orderFood`, simulates preparation, and publishes `foodReady`. |
 | **`bar-desk`** | **Read Model & Cashier** | Aggregates item states, handles `intent.checkStatus`, executes `intent.payBill`, and issues receipts. |
 
 ---
 
-## 🧠 Intent Classification with TypeSafe AI
+## 🧠 Intent Classification with TypeSafe AI Jev
 
-The **Bar-Dispatcher** replaces brittle regex matching with the **TypeSafe Spring AI `Choice` primitive**:
+Rather than using a slow generative LLM, the Dispatcher integrates **TypeSafe AI's Jev**—a specialized System One decision model:
 
-- **Semantic Disambiguation**: Natural language inputs in any language are mapped to discrete business intents (`order_drink`, `order_food`, `check_status`, `pay_bill`).
-- **Confidence Scoring**: Every classification returns a confidence score (`confidence()`) and plausible alternatives (`optionsAbove(threshold)`), enabling policy-driven gating before event emission.
-- **Fail-Safe Routing**: Requests with low confidence or classified as `unknown` are rejected at the edge with immediate feedback.
+- **Ultra-Low Latency (70–200ms)**: Fast, deterministic classification without free-text generation.
+- **Speculative Fan-Out**: Evaluates multiple choice questions (`order_drink`, `order_food`, `check_status`, `pay_bill`) concurrently in a single HTTP request.
+- **Confidence Safety Gating**: Rejects ambiguous inputs below the confidence threshold (`0.65`) before publishing any events.
+- **Zero Third-Party SDK Bloat**: Integrated cleanly via Spring Boot's native `RestClient` and Java records.
 
 ---
 
@@ -61,7 +76,8 @@ The **Bar-Dispatcher** replaces brittle regex matching with the **TypeSafe Sprin
 - **Language**: Java 25
 - **Framework**: Spring Boot 3.5.5
 - **Message Broker**: [LavinMQ](https://lavinmq.com/) (AMQP 0-9-1 cloud instance or local)
-- **Intent Classifier**: [Spring AI Community TypeSafe (`Choice` primitive)](https://spring-ai-community.github.io/spring-ai-typesafe/latest/concepts/primitives/#choice)
+- **Intent Classifier**: [TypeSafe AI Jev (System One Model)](https://api.typesafe.ai)
+- **HTTP Client**: Spring Boot `RestClient`
 - **Build Tool**: Maven
 
 ---
@@ -71,8 +87,8 @@ The **Bar-Dispatcher** replaces brittle regex matching with the **TypeSafe Sprin
 ### 1. Prerequisites
 - **JDK 25** installed and configured (`java -version`).
 - Maven 3.9+.
-- An accessible **LavinMQ** instance (e.g. CloudAMQP free tier or local).
-- An OpenAI-compatible API key (or local Ollama instance) for the intent classifier.
+- An accessible **LavinMQ** instance (e.g. CloudAMQP free tier or local container).
+- A **TypeSafe AI** API key for Jev.
 
 ### 2. Clone the repository
 ```bash
@@ -83,7 +99,7 @@ cd idea-virtual-bar
 ### 3. Configure environment variables
 ```bash
 export LAVINMQ_URL="amqps://username:password@instance.lavinmq.com/vhost"
-export OPENAI_API_KEY="your-api-key"
+export JEV_API_KEY="your-typesafe-jev-api-key"
 ```
 
 ### 4. Build the project
