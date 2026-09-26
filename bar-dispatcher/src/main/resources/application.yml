@@ -1,0 +1,19 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: bar-dispatcher
+  rabbitmq:
+    addresses: ${LAVINMQ_URL:amqp://guest:guest@localhost:5672/}
+
+# TypeSafe AI Jev Configuration
+jev:
+  api:
+    url: ${JEV_API_URL:https://api.typesafe.ai/v1/systemone}
+    key: ${JEV_API_KEY:your-typesafe-api-key}
+    model: ${JEV_MODEL:jev-latest}
+
+logging:
+  level:
+    com.gist.idea.bar: DEBUG
