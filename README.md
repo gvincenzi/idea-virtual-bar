@@ -25,6 +25,55 @@ The **Intent-Driven Architecture** treats business intent as the primary entry p
 
 ---
 
+## 🏛️ The Architectural Triad: Three Core Interaction Patterns
+
+Rather than exposing fragmented, resource-oriented REST endpoints (`/orders`, `/status`, `/wait`), the entire molecule exposes a **single universal entry point (`POST /intent`)**. 
+
+Depending on the classified intent, the gateway dynamically activates one of the **three foundational patterns of modern distributed systems**:
+
+```
+                       POST /intent
+                            │
+               ┌────────────┴────────────┐
+               │  TypeSafe AI Jev Router │
+               └────────────┬────────────┘
+                            │
+       ┌────────────────────┼────────────────────┐
+       ▼                    ▼                    ▼
+[ 1. Write-Path ]    [ 2. Read-Path ]     [ 3. Reactive-Path ]
+  Async Fire & Forget  Snapshot Point-in-Time Long-Poll Event Stream
+  (ORDER_DRINK / FOOD) (CHECK_STATUS)         (AWAIT_READY)
+  ↳ 202 Accepted       ↳ 200 OK (State Snapshot) ↳ 200 OK (On Completion)
+```
+
+1. **Asynchronous Command / Write-Path (`ORDER_DRINK`, `ORDER_FOOD`)**:
+   - Dispatches work to the responsible worker microservices (`Counter` or `Kitchen`).
+   - Non-blocking: returns `202 Accepted` immediately with the minted `correlationId`.
+   - Supports **Speculative Fan-out**: compound requests like *"I'd like a cappuccino and a croissant"* emit multiple events in parallel under the same `correlationId`.
+2. **Point-in-Time Snapshot Query / Read-Path (`CHECK_STATUS`)**:
+   - Queries the aggregated materialized view in the `Desk-Service`.
+   - Returns an immediate snapshot of the order's internal progression (e.g. `cappuccino: READY, croissant: ORDERED -> IN_PROGRESS`).
+3. **Reactive Long-Poll / Completion Notification (`AWAIT_READY`)**:
+   - Suspends the incoming HTTP connection in a non-blocking fashion (`DeferredResult`).
+   - Unblocks reactively when the `Desk-Service` evaluates that *all* items have completed and emits `OrderReadyEvent`.
+
+---
+
+## 🔍 Pure Observability: Why Both `CHECK_STATUS` and `AWAIT_READY` Matter
+
+A common architectural trap in distributed systems is conflating **state inspection** with **completion notification**. This project intentionally decouples them to achieve **Pure Observability**:
+
+| Dimension | `CHECK_STATUS` (Snapshot Inspection) | `AWAIT_READY` (State-Transition Push) |
+|---|---|---|
+| **Nature** | **Synchronous / Instantaneous** (~5ms) | **Reactive / Suspended** (1s to 30s) |
+| **Semantic Question** | *"What is happening inside the molecule right now?"* | *"Notify me the exact instant everything is done."* |
+| **Domain State** | Inspects intermediate states (`IN_PROGRESS`, item-by-item breakdown) | Awaits terminal readiness (`READY`) |
+| **Resilience & Diagnostics** | Essential when an await times out, allowing operators or users to diagnose partial failures or bottlenecks. | Provides smooth, zero-polling client UX without burning CPU or network bandwidth. |
+
+By supporting both through natural language, the architecture ensures that the system is **transparent and inspectable at every stage of the lifecycle**, answering the core question raised in the article: *How do we ensure distributed actions remain observable, measurable, and verifiable in production?*
+
+---
+
 ## ☕ The Domain: Virtual Bar
 
 The architecture models a **Virtual Bar** with a single universal entry point and specialized workers:
@@ -33,16 +82,14 @@ The architecture models a **Virtual Bar** with a single universal entry point an
 
 ### The Universal Entry Point (`POST /intent`)
 
-Clients interact exclusively through a single endpoint. Jev classifies the request into one or more business intents via speculative fan-out:
+Clients interact exclusively through `POST /intent`. Jev classifies the request into one or more business intents via speculative fan-out:
 
 | Business Intent (`IntentEnum`) | Target Worker | LavinMQ Routing Key | Behavior |
 |---|---|---|---|
 | **`ORDER_DRINK`** | `Counter-Service` | `intent.orderDrink` | Asynchronous (`202 Accepted`) |
 | **`ORDER_FOOD`** | `Kitchen-Service` | `intent.orderFood` | Asynchronous (`202 Accepted`) |
-| **`CHECK_STATUS`** | `Desk-Service` | `intent.checkStatus` | Synchronous bridge via Correlation ID |
-| **`PAY_BILL`** | `Desk-Service` | `intent.payBill` | Synchronous bridge via Correlation ID |
-
-> **Compound Intents Supported**: A sentence like *"I'd like a cappuccino and a croissant"* triggers both `ORDER_DRINK` and `ORDER_FOOD` in parallel under a **single Correlation ID**, dispatched across separate queues.
+| **`CHECK_STATUS`** | `Desk-Service` | `intent.checkStatus` | Synchronous snapshot via Correlation ID |
+| **`AWAIT_READY`** | `Desk-Service` | `event.orderReady` (listener) | Reactive long-poll via `DeferredResult` |
 
 ---
 
@@ -55,7 +102,7 @@ All inter-service communication flows through a single **Topic Exchange** named 
                            │       TOPIC EXCHANGE: bar.exchange     │
                            └─┬──────────────┬──────────────┬──────┬─┘
                              │              │              │      │
-          intent.orderDrink  │              │              │      │ intent.payBill
+          intent.orderDrink  │              │              │      │ event.orderReady
          ────────────────────┘              │              │      └────────────────────┐
         │                 intent.orderFood  │              │ intent.checkStatus        │
         │                ───────────────────┘              │                           │
@@ -63,24 +110,15 @@ All inter-service communication flows through a single **Topic Exchange** named 
         │               │               intent.order*      │                           │
         ▼               ▼              ────────────────────┘                           ▼
 ┌──────────────┐ ┌──────────────┐    ┌───────────────────────────┐         ┌───────────────────────────┐
-│q.counter.    │ │ q.kitchen.   │    │      q.desk.events        │         │      q.desk.payments      │
-│   drinks     │ │    food      │    │ (Order Lifecycle Tracker) │         │  (Bill Settlement & Cash) │
+│q.counter.    │ │ q.kitchen.   │    │      q.desk.events        │         │   q.dispatcher.responses  │
+│   drinks     │ │    food      │    │ (Order Lifecycle Tracker) │         │ (Unblocks Waiting HTTP)   │
 └───────┬──────┘ └──────┬───────┘    └─────────────┬─────────────┘         └─────────────┬─────────────┘
         │               │                          │                                     │
    Counter-Service Kitchen-Service                 │                                     │
-        │               │                          │                                     │
         │               │                          ▼                                     ▼
-        │ drinkReady    │ foodReady        Desk-Service (Read Model)             Desk-Service (Cashier)
-         ───────────────┴────────────────────────► │                                     │
-                                                   │ event.orderStatusReported           │ event.receiptIssued
-                                                   └──────────────────┬──────────────────┘
-                                                                      │
-                                                                      ▼
-                                                         ┌───────────────────────────┐
-                                                         │   q.dispatcher.responses  │
-                                                         └─────────────┬─────────────┘
-                                                                       │
-                                                            Bar-Dispatcher (Spike)
+        │ drinkReady    │ foodReady        Desk-Service (Read Model)               Bar-Dispatcher
+         ───────────────┴────────────────────────► │ (OrderReadyEvent / StatusReport)   (The Spike)
+                                                   └─────────────────────────────────────┘
 ```
 
 ### Complete Routing & Binding Matrix
@@ -89,18 +127,12 @@ All inter-service communication flows through a single **Topic Exchange** named 
 |---|---|---|---|---|
 | **Dispatcher** | `intent.orderDrink` | `q.counter.drinks` | `bar-counter` | `OrderDrinkIntentEvent` (item text, correlationId) |
 | **Dispatcher** | `intent.orderFood` | `q.kitchen.food` | `bar-kitchen` | `OrderFoodIntentEvent` (item text, correlationId) |
-| **Dispatcher** | `intent.order*` *(wildcard)* | `q.desk.events` | `bar-desk` | Registers expected items as `ORDERED` in the order lifecycle |
-| **Counter** | `event.drinkReady` | `q.desk.events` | `bar-desk` | `DrinkReadyEvent` (marks drink `READY`, adds price) |
-| **Kitchen** | `event.foodReady` | `q.desk.events` | `bar-desk` | `FoodReadyEvent` (marks food `READY`, adds price) |
+| **Dispatcher** | `intent.order*` *(wildcard)* | `q.desk.events` | `bar-desk` | Registers expected items as `ORDERED` in the lifecycle tracker |
+| **Counter** | `event.drinkReady` | `q.desk.events` | `bar-desk` | `DrinkReadyEvent` (marks drink `READY`) |
+| **Kitchen** | `event.foodReady` | `q.desk.events` | `bar-desk` | `FoodReadyEvent` (marks food `READY`) |
 | **Dispatcher** | `intent.checkStatus` | `q.desk.queries` | `bar-desk` | `CheckStatusIntentEvent` (correlationId) |
-| **Desk** | `event.orderStatusReported` | `q.dispatcher.responses` | `bar-dispatcher` | `OrderStatusReportedEvent` (aggregates items & status) |
-| **Dispatcher** | `intent.payBill` | `q.desk.payments` | `bar-desk` | `PayBillIntentEvent` (correlationId, paymentMethod) |
-| **Desk** | `event.receiptIssued` | `q.dispatcher.responses` | `bar-dispatcher` | `ReceiptIssuedEvent` (marks order `PAID`, receipt data) |
-
-### Key Architectural Highlights of this Topology
-- **Zero Polling over Broker**: The Desk service receives items in real-time as workers finish via `event.*Ready` pattern binding.
-- **Order Lifecycle Autonomy**: Because `q.desk.events` also binds to `intent.order*`, the Desk is aware of what was ordered from millisecond zero without needing a synchronous call from the Dispatcher.
-- **Async-to-Sync HTTP Bridging**: The Dispatcher binds `q.dispatcher.responses` to resolve in-flight `CompletableFuture`s for client queries (`CHECK_STATUS`, `PAY_BILL`) while preserving non-blocking async decoupling inside the molecule.
+| **Desk** | `event.orderStatusReported` | `q.dispatcher.responses` | `bar-dispatcher` | `OrderStatusReportedEvent` (aggregates item states) |
+| **Desk** | `event.orderReady` | `q.dispatcher.responses` | `bar-dispatcher` | `OrderReadyEvent` (unblocks pending `AWAIT_READY` requests) |
 
 ---
 
@@ -114,7 +146,7 @@ The repository is organized as a multi-module Maven project (`com.gist:idea-virt
 | **`bar-dispatcher`** | **The Spike (Alpha)** | The sole public entry point (`POST /intent`). Classifies intents via **TypeSafe AI Jev**, assigns `correlationId`, and publishes to LavinMQ. |
 | **`bar-counter`** | **Drink Worker** | Consumes `intent.orderDrink`, simulates preparation, and publishes `drinkReady`. |
 | **`bar-kitchen`** | **Food Worker** | Consumes `intent.orderFood`, simulates preparation, and publishes `foodReady`. |
-| **`bar-desk`** | **Read Model & Cashier** | Aggregates item states, handles `intent.checkStatus`, executes `intent.payBill`, and issues receipts. |
+| **`bar-desk`** | **Read Model & Aggregator**| Tracks item states, answers status queries, and publishes completion events when orders are `READY`. |
 
 ---
 
@@ -123,7 +155,7 @@ The repository is organized as a multi-module Maven project (`com.gist:idea-virt
 Rather than using a slow generative LLM, the Dispatcher integrates **TypeSafe AI's Jev**—a specialized System One decision model:
 
 - **Ultra-Low Latency (70–200ms)**: Fast, deterministic classification without free-text generation.
-- **Speculative Fan-Out**: Evaluates multiple choice questions (`order_drink`, `order_food`, `check_status`, `pay_bill`) concurrently in a single HTTP request.
+- **Speculative Fan-Out**: Evaluates multiple choice questions (`order_drink`, `order_food`, `check_status`, `await_ready`) concurrently in a single HTTP request.
 - **Confidence Safety Gating**: Rejects ambiguous inputs below the confidence threshold (`0.65`) before publishing any events.
 - **Zero Third-Party SDK Bloat**: Integrated cleanly via Spring Boot's native `RestClient` and Java records.
 
@@ -136,6 +168,7 @@ Rather than using a slow generative LLM, the Dispatcher integrates **TypeSafe AI
 - **Message Broker**: [LavinMQ](https://lavinmq.com/) (AMQP 0-9-1 cloud instance or local)
 - **Intent Classifier**: [TypeSafe AI Jev (System One Model)](https://api.typesafe.ai)
 - **HTTP Client**: Spring Boot `RestClient`
+- **Async Web**: Spring MVC `DeferredResult`
 - **Build Tool**: Maven
 
 ---
