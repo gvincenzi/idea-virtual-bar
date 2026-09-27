@@ -1,6 +1,7 @@
 package com.gist.idea.bar.dispatcher.service;
 
 import com.gist.idea.bar.common.amqp.AmqpTopology;
+import com.gist.idea.bar.common.event.OrderReadyEvent;
 import com.gist.idea.bar.common.event.OrderStatusReportedEvent;
 import com.gist.idea.bar.common.event.ReceiptIssuedEvent;
 import org.slf4j.Logger;
@@ -24,10 +25,11 @@ import java.util.concurrent.TimeUnit;
 public class ResponseTrackerService {
 
     private static final Logger log = LoggerFactory.getLogger(ResponseTrackerService.class);
-    private static final long TIMEOUT_SECONDS = 5;
+    private static final long TIMEOUT_SECONDS = 5, TIMEOUT_ORDER_SECONDS=30;
 
     private final Map<UUID, CompletableFuture<OrderStatusReportedEvent>> statusWaiters = new ConcurrentHashMap<>();
     private final Map<UUID, CompletableFuture<ReceiptIssuedEvent>> receiptWaiters = new ConcurrentHashMap<>();
+    private final Map<UUID, CompletableFuture<OrderReadyEvent>> readyWaiters = new ConcurrentHashMap<>();
 
     /**
      * Registers an expectation for an OrderStatusReportedEvent matching the given correlationId.
@@ -48,6 +50,28 @@ public class ResponseTrackerService {
                         log.debug("COMPLETE status wait for correlationId: {}", correlationId);
                     }
                     statusWaiters.remove(correlationId);
+                });
+    }
+    
+    /**
+     * Registers an expectation for a OrderReadyEvent matching the given correlationId.
+     * 
+     * @param correlationId unique tracking ID
+     * @return CompletableFuture that will complete when the order ready event arrives from AMQP, or timeout
+     */
+    @SuppressWarnings("unused")
+    public CompletableFuture<OrderReadyEvent> registerReadyWait(UUID correlationId) {
+        log.debug("Registering await-ready wait for correlationId: {}", correlationId);
+        CompletableFuture<OrderReadyEvent> future = new CompletableFuture<>();
+        readyWaiters.put(correlationId, future);
+        return future.orTimeout(TIMEOUT_ORDER_SECONDS, TimeUnit.SECONDS)
+                .whenComplete((result, ex) -> {
+                    if (ex != null) {
+                        log.warn("FAILED/TIMEOUT await-ready for correlationId: {} - Error: {}", correlationId, ex.getMessage());
+                    } else {
+                        log.debug("COMPLETE await-ready for correlationId: {}", correlationId);
+                    }
+                    readyWaiters.remove(correlationId);
                 });
     }
 
@@ -86,6 +110,22 @@ public class ResponseTrackerService {
             future.complete(event);
         } else {
             log.warn("Received unexpected or timed-out status report for correlationId: {}", event.correlationId());
+        }
+    }
+    
+    /**
+     * AMQP listener handler for order ready responses arriving from Desk-Service.
+     *
+     * @param event the reported status event
+     */
+    @RabbitHandler
+    public void onOrderReady(OrderReadyEvent event) {
+        log.info("Received OrderReadyEvent for correlationId: {}", event.correlationId());
+        CompletableFuture<OrderReadyEvent> future = readyWaiters.remove(event.correlationId());
+        if (future != null) {
+            future.complete(event);
+        } else {
+            log.debug("No active await-ready waiter for correlationId: {}", event.correlationId());
         }
     }
 

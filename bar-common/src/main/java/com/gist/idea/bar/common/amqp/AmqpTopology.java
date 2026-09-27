@@ -18,11 +18,12 @@ public final class AmqpTopology {
     // Routing Keys (Domain Events)
     public static final String ROUTING_EVENT_DRINK_READY    = "event.drinkReady";
     public static final String ROUTING_EVENT_FOOD_READY     = "event.foodReady";
+    public static final String ROUTING_EVENT_ORDER_READY    = "event.orderReady";
     public static final String ROUTING_EVENT_STATUS_REPORT  = "event.orderStatusReported";
     public static final String ROUTING_EVENT_RECEIPT_ISSUED = "event.receiptIssued";
 
     // Pattern jolly for binding (ex. Desk listens drinkReady and foodReady and drink or food ordered)
-    public static final String ROUTING_PATTERN_ALL_READY = "event.*Ready";
+    public static final String ROUTING_PATTERN_ALL_READY  = "event.*Ready";
     public static final String ROUTING_PATTERN_ALL_ORDERS = "intent.order*";
 
     // Queue names

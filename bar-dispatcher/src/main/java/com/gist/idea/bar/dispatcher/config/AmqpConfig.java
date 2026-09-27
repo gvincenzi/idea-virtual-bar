@@ -53,6 +53,20 @@ public class AmqpConfig {
                 .to(barExchange)
                 .with(AmqpTopology.ROUTING_EVENT_STATUS_REPORT);
     }
+    
+    /**
+     * Binds the order ready event routing key to the dispatcher response queue.
+     * 
+     * @param dispatcherResponseQueue the response queue bean
+     * @param barExchange the topic exchange bean
+     * @return the created Binding
+     */
+    @Bean
+    public Binding orderReadyBinding(Queue dispatcherResponseQueue, TopicExchange barExchange) {
+        return BindingBuilder.bind(dispatcherResponseQueue)
+                .to(barExchange)
+                .with(AmqpTopology.ROUTING_EVENT_ORDER_READY);
+    }
 
     /**
      * Binds the receipt issued event routing key to the dispatcher response queue.

@@ -30,6 +30,12 @@ public enum IntentEnum {
             AmqpTopology.ROUTING_INTENT_CHECK_STATUS,
             "Customer is asking about order progress, waiting time, or whether items are ready"
     ),
+    
+    AWAIT_READY(
+            "await_ready",
+            "", // Handled as an in-flight long-poll wait on event.orderReady
+            "Customer wants to be notified or wait until the order is completely ready (e.g. 'tell me when ready', 'wait until done', 'alert me when finished')"
+    ),
 
     PAY_BILL(
             "pay_bill",
