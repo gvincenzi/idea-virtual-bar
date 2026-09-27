@@ -1,27 +1,33 @@
 # ☕ IDEA - Intent Driven Event Architecture (Virtual Bar)
 <img src="src/main/resources/static/images/logo.jpg" width="200">
 
-[![Java 25](https://img.shields.io/badge/Java-25-blue.svg)](https://openjdk.org/)
+[![Java 21 LTS](https://img.shields.io/badge/Java-21%20LTS-blue.svg)](https://openjdk.org/)
 [![Spring Boot 3.5.5](https://img.shields.io/badge/Spring%20Boot-3.5.5-brightgreen.svg)](https://spring.io/projects/spring-boot)
 [![AMQP 0-9-1](https://img.shields.io/badge/Broker-LavinMQ-orange.svg)](https://lavinmq.com/)
 [![Intent Classifier](https://img.shields.io/badge/TypeSafe%20AI-Jev%20System%20One-red.svg)](https://api.typesafe.ai)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 > **"One microservice = One business intent"**  
-> Reference implementation demonstrating the **Intent-Driven Event Architecture (IDEA)** pattern.
+> An exploratory Proof-of-Concept and architectural blueprint investigating intent-first routing and end-to-end traceability across event-driven microservices.
 
 ---
 
-## 📖 Architectural Background & Vision
+## 📖 Architectural Exploration & Scope
 
-This project is a hands-on implementation of the architectural principles formulated by [Giuseppe Vincenzi](https://www.linkedin.com/in/giuseppevincenzi/) in:  
+This repository provides a concrete reference implementation exploring the hypothesis introduced by [Giuseppe Vincenzi](https://www.linkedin.com/in/giuseppevincenzi/) (IT Process Architect) in the article:  
 👉 **[Intent-Driven Architecture: a microservice molecule driven by Business and Events](https://www.linkedin.com/pulse/intent-driven-architecture-microservice-molecule-driven-vincenzi-jzdhe/)**
 
-The **Intent-Driven Architecture** treats business intent as the primary entry point of a distributed software system, harmonizing **Domain-Driven Design (DDD)** and **Event-Driven Architecture (EDA)** across **three foundational pillars**:
+Rather than claiming an industry-wide standard, this project serves as a **working architectural laboratory** to address a specific distributed systems question:  
+*Can we treat natural language business intent as the sole public gateway of a microservice molecule, while keeping the resulting asynchronous workflows observable, measurable, and deterministic in production?*
 
-1. **The Asynchronous Intent Distributor (Spike / Alpha)**: A qualified single access gateway that ingests free-form natural language, classifies intents at ultra-low latency using **TypeSafe AI Jev (System One Model)** with speculative fan-out, and dispatches discrete events to the message broker.
-2. **End-to-End Correlation ID**: Every incoming intent lifecycle receives a unique correlation identifier that travels through every worker, topic, and return event.
-3. **Observability & Closed-Loop Feedback**: A dedicated read-model service (`Desk-Service`) that aggregates state across workers, providing continuous auditability and state verification.
+The architecture bridges **Domain-Driven Design (DDD)** and **Event-Driven Architecture (EDA)** across **three foundational pillars**:
+
+1. **The Asynchronous Intent Distributor (The Spike / Alpha)**: A qualified single entry point that ingests natural language, evaluates business intents with low-latency classification (via TypeSafe AI Jev speculative fan-out), and dispatches discrete events to the broker.
+2. **End-to-End Correlation ID**: Every intent lifecycle is minted with a unique identifier that propagates across every downstream queue, worker, and return event.
+3. **Observability & Closed-Loop Feedback**: A dedicated read-model service (`Desk-Service`) that tracks intermediate states and emits completion events to close the feedback loop.
+
+### Scope & Nature of this Project
+This project is an **architectural prototype and didactic blueprint**, not a turnkey enterprise package. Its purpose is to demonstrate structural patterns—intent-based fan-out, Correlation ID propagation, CQRS-style read-models, and reactive deferred completion—with minimal accidental complexity. Enterprise concerns such as distributed tracing (OpenTelemetry), API security, and Dead Letter Exchanges are discussed as architectural extension points.
 
 ---
 
@@ -70,7 +76,7 @@ A common architectural trap in distributed systems is conflating **state inspect
 | **Domain State** | Inspects intermediate states (`IN_PROGRESS`, item-by-item breakdown) | Awaits terminal readiness (`READY`) |
 | **Resilience & Diagnostics** | Essential when an await times out, allowing operators or users to diagnose partial failures or bottlenecks. | Provides smooth, zero-polling client UX without burning CPU or network bandwidth. |
 
-By supporting both through natural language, the architecture ensures that the system is **transparent and inspectable at every stage of the lifecycle**, answering the core question raised in the article: *How do we ensure distributed actions remain observable, measurable, and verifiable in production?*
+By supporting both through natural language, the architecture ensures that the system is **transparent and inspectable at every stage of the lifecycle**, directly addressing the question of observability and controllability in distributed environments.
 
 ---
 
@@ -163,7 +169,7 @@ Rather than using a slow generative LLM, the Dispatcher integrates **TypeSafe AI
 
 ## 🛠️ Technology Stack
 
-- **Language**: Java 25
+- **Language**: Java 21 LTS
 - **Framework**: Spring Boot 3.5.5
 - **Message Broker**: [LavinMQ](https://lavinmq.com/) (AMQP 0-9-1 cloud instance or local)
 - **Intent Classifier**: [TypeSafe AI Jev (System One Model)](https://api.typesafe.ai)
@@ -176,7 +182,7 @@ Rather than using a slow generative LLM, the Dispatcher integrates **TypeSafe AI
 ## 🚀 Prerequisites & Quickstart
 
 ### 1. Prerequisites
-- **JDK 25** installed and configured (`java -version`).
+- **JDK 21 LTS** installed and configured (`java -version`).
 - Maven 3.9+.
 - An accessible **LavinMQ** instance (e.g. CloudAMQP free tier or local container).
 - A **TypeSafe AI** API key for Jev.
