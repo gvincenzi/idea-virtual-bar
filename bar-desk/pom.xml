@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 
+         https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.gist</groupId>
+        <artifactId>idea-virtual-bar</artifactId>
+        <version>1.0.0</version>
+    </parent>
+
+    <artifactId>bar-desk</artifactId>
+    <packaging>jar</packaging>
+
+    <name>IDEA - Virtual Bar :: Desk (Cashier &amp; Read Model)</name>
+    <description>Molecule observability and cashier worker: aggregates events, handles queries and payments</description>
+
+    <dependencies>
+        <!-- Shared Domain Contracts -->
+        <dependency>
+            <groupId>com.gist</groupId>
+            <artifactId>bar-common</artifactId>
+        </dependency>
+
+        <!-- Spring AMQP (LavinMQ) -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-amqp</artifactId>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+        </plugins>
+    </build>
+</project>

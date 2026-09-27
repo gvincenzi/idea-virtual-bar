@@ -25,7 +25,9 @@ import java.util.Set;
 @Service
 public class IntentClassifierService {
 
-    private static final Logger log = LoggerFactory.getLogger(IntentClassifierService.class);
+    private static final String NO = "no";
+	private static final String YES = "yes";
+	private static final Logger log = LoggerFactory.getLogger(IntentClassifierService.class);
     private static final double CONFIDENCE_THRESHOLD = 0.65;
 
     private final RestClient restClient;
@@ -48,8 +50,8 @@ public class IntentClassifierService {
         this.questions = new HashMap<>();
         for (IntentEnum intent : IntentEnum.values()) {
             this.questions.put(intent.getJevKey(), JevQuestion.choice(Map.of(
-                "yes", intent.getDescription(),
-                "no",  "Customer is NOT requesting this"
+                YES, intent.getDescription(),
+                NO,  "Customer is NOT requesting this"
             )));
         }
 
@@ -87,7 +89,7 @@ public class IntentClassifierService {
                     JevAnswer answer = entry.getValue();
 
                     double confidence = answer.confidence() != null ? answer.confidence() : 0.0;
-                    if ("yes".equalsIgnoreCase(answer.choice()) && confidence >= CONFIDENCE_THRESHOLD) {
+                    if (YES.equalsIgnoreCase(answer.choice()) && confidence >= CONFIDENCE_THRESHOLD) {
                         log.info("Detected intent '{}' with confidence {}", questionKey, confidence);
                         IntentEnum.fromJevKey(questionKey).ifPresent(matchedIntents::add);
                     }

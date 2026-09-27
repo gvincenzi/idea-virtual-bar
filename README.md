@@ -46,13 +46,71 @@ Clients interact exclusively through a single endpoint. Jev classifies the reque
 
 ---
 
+## 📡 AMQP Topology & Message Flow (LavinMQ)
+
+All inter-service communication flows through a single **Topic Exchange** named **`bar.exchange`**. Microservices never call each other directly; they only bind their dedicated queues using specific routing keys or wildcard patterns.
+
+```
+                           ┌────────────────────────────────────────┐
+                           │       TOPIC EXCHANGE: bar.exchange     │
+                           └─┬──────────────┬──────────────┬──────┬─┘
+                             │              │              │      │
+          intent.orderDrink  │              │              │      │ intent.payBill
+         ────────────────────┘              │              │      └────────────────────┐
+        │                 intent.orderFood  │              │ intent.checkStatus        │
+        │                ───────────────────┘              │                           │
+        │               │                     event.*Ready │                           │
+        │               │               intent.order*      │                           │
+        ▼               ▼              ────────────────────┘                           ▼
+┌──────────────┐ ┌──────────────┐    ┌───────────────────────────┐         ┌───────────────────────────┐
+│q.counter.    │ │ q.kitchen.   │    │      q.desk.events        │         │      q.desk.payments      │
+│   drinks     │ │    food      │    │ (Order Lifecycle Tracker) │         │  (Bill Settlement & Cash) │
+└───────┬──────┘ └──────┬───────┘    └─────────────┬─────────────┘         └─────────────┬─────────────┘
+        │               │                          │                                     │
+   Counter-Service Kitchen-Service                 │                                     │
+        │               │                          │                                     │
+        │               │                          ▼                                     ▼
+        │ drinkReady    │ foodReady        Desk-Service (Read Model)             Desk-Service (Cashier)
+         ───────────────┴────────────────────────► │                                     │
+                                                   │ event.orderStatusReported           │ event.receiptIssued
+                                                   └──────────────────┬──────────────────┘
+                                                                      │
+                                                                      ▼
+                                                         ┌───────────────────────────┐
+                                                         │   q.dispatcher.responses  │
+                                                         └─────────────┬─────────────┘
+                                                                       │
+                                                            Bar-Dispatcher (Spike)
+```
+
+### Complete Routing & Binding Matrix
+
+| Publisher | Routing Key | Target Queue | Consumer | Semantic Payload / Event |
+|---|---|---|---|---|
+| **Dispatcher** | `intent.orderDrink` | `q.counter.drinks` | `bar-counter` | `OrderDrinkIntentEvent` (item text, correlationId) |
+| **Dispatcher** | `intent.orderFood` | `q.kitchen.food` | `bar-kitchen` | `OrderFoodIntentEvent` (item text, correlationId) |
+| **Dispatcher** | `intent.order*` *(wildcard)* | `q.desk.events` | `bar-desk` | Registers expected items as `ORDERED` in the order lifecycle |
+| **Counter** | `event.drinkReady` | `q.desk.events` | `bar-desk` | `DrinkReadyEvent` (marks drink `READY`, adds price) |
+| **Kitchen** | `event.foodReady` | `q.desk.events` | `bar-desk` | `FoodReadyEvent` (marks food `READY`, adds price) |
+| **Dispatcher** | `intent.checkStatus` | `q.desk.queries` | `bar-desk` | `CheckStatusIntentEvent` (correlationId) |
+| **Desk** | `event.orderStatusReported` | `q.dispatcher.responses` | `bar-dispatcher` | `OrderStatusReportedEvent` (aggregates items & status) |
+| **Dispatcher** | `intent.payBill` | `q.desk.payments` | `bar-desk` | `PayBillIntentEvent` (correlationId, paymentMethod) |
+| **Desk** | `event.receiptIssued` | `q.dispatcher.responses` | `bar-dispatcher` | `ReceiptIssuedEvent` (marks order `PAID`, receipt data) |
+
+### Key Architectural Highlights of this Topology
+- **Zero Polling over Broker**: The Desk service receives items in real-time as workers finish via `event.*Ready` pattern binding.
+- **Order Lifecycle Autonomy**: Because `q.desk.events` also binds to `intent.order*`, the Desk is aware of what was ordered from millisecond zero without needing a synchronous call from the Dispatcher.
+- **Async-to-Sync HTTP Bridging**: The Dispatcher binds `q.dispatcher.responses` to resolve in-flight `CompletableFuture`s for client queries (`CHECK_STATUS`, `PAY_BILL`) while preserving non-blocking async decoupling inside the molecule.
+
+---
+
 ## 🧩 Molecule Structure (Maven Modules)
 
 The repository is organized as a multi-module Maven project (`com.gist:idea-virtual-bar:1.0.0`):
 
 | Module | Architectural Role | Description |
 |---|---|---|
-| **`bar-common`** | **Contracts & Kernel** | Shared immutable Java records for domain events (`DomainEvent`), `IntentEnum`, and AMQP topology definitions. |
+| **`bar-common`** | **Contracts & Kernel** | Shared immutable Java records for domain events (`DomainEvent`), `IntentEnum`, and AMQP topology definitions (`AmqpTopology`). |
 | **`bar-dispatcher`** | **The Spike (Alpha)** | The sole public entry point (`POST /intent`). Classifies intents via **TypeSafe AI Jev**, assigns `correlationId`, and publishes to LavinMQ. |
 | **`bar-counter`** | **Drink Worker** | Consumes `intent.orderDrink`, simulates preparation, and publishes `drinkReady`. |
 | **`bar-kitchen`** | **Food Worker** | Consumes `intent.orderFood`, simulates preparation, and publishes `foodReady`. |
@@ -113,7 +171,7 @@ mvn clean install
 
 **Giuseppe Vincenzi**
 - LinkedIn: [@giuseppevincenzi](https://www.linkedin.com/in/giuseppevincenzi/)
-- Reference article: [Intent-Driven Architecture on LinkedIn Pulse](https://www.linkedin.com/pulse/intent-driven-architecture-microservice-molecule-driven-vincenzi-jzdhe/)
+- Reference article: [Intent-Driven Architecture: a microservice molecule driven by Business and Events](https://www.linkedin.com/pulse/intent-driven-architecture-microservice-molecule-driven-vincenzi-jzdhe/)
 
 ---
 

@@ -35,12 +35,20 @@ public class ResponseTrackerService {
      * @param correlationId unique tracking ID
      * @return CompletableFuture that will complete when the event arrives from AMQP, or timeout
      */
+    @SuppressWarnings("unused")
     public CompletableFuture<OrderStatusReportedEvent> registerStatusWait(UUID correlationId) {
         log.debug("Registering status wait for correlationId: {}", correlationId);
         CompletableFuture<OrderStatusReportedEvent> future = new CompletableFuture<>();
         statusWaiters.put(correlationId, future);
         return future.orTimeout(TIMEOUT_SECONDS, TimeUnit.SECONDS)
-                .whenComplete((result, ex) -> statusWaiters.remove(correlationId));
+                .whenComplete((result, ex) -> {
+                    if (ex != null) {
+                        log.warn("FAILED/TIMEOUT status wait for correlationId: {} - Error: {}", correlationId, ex.getMessage());
+                    } else {
+                        log.debug("COMPLETE status wait for correlationId: {}", correlationId);
+                    }
+                    statusWaiters.remove(correlationId);
+                });
     }
 
     /**
@@ -49,12 +57,20 @@ public class ResponseTrackerService {
      * @param correlationId unique tracking ID
      * @return CompletableFuture that will complete when the receipt arrives from AMQP, or timeout
      */
+    @SuppressWarnings("unused")
     public CompletableFuture<ReceiptIssuedEvent> registerReceiptWait(UUID correlationId) {
         log.debug("Registering receipt wait for correlationId: {}", correlationId);
         CompletableFuture<ReceiptIssuedEvent> future = new CompletableFuture<>();
         receiptWaiters.put(correlationId, future);
         return future.orTimeout(TIMEOUT_SECONDS, TimeUnit.SECONDS)
-                .whenComplete((result, ex) -> receiptWaiters.remove(correlationId));
+                .whenComplete((result, ex) -> {
+                    if (ex != null) {
+                        log.warn("FAILED/TIMEOUT receipt wait for correlationId: {} - Error: {}", correlationId, ex.getMessage());
+                    } else {
+                        log.debug("COMPLETE receipt wait for correlationId: {}", correlationId);
+                    }
+                    receiptWaiters.remove(correlationId);
+                });
     }
 
     /**
