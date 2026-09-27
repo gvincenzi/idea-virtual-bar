@@ -1,19 +1,19 @@
 package com.gist.idea.bar.desk.service;
 
-import com.gist.idea.bar.common.amqp.AmqpTopology;
-import com.gist.idea.bar.common.event.OrderReadyEvent;
-import com.gist.idea.bar.common.event.OrderStatusReportedEvent;
-import com.gist.idea.bar.common.event.ReceiptIssuedEvent;
-import com.gist.idea.bar.common.model.OrderStatus;
-import com.gist.idea.bar.desk.domain.Order;
-import com.gist.idea.bar.desk.repository.OrderRepository;
+import java.util.Map;
+import java.util.UUID;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.stereotype.Service;
 
-import java.util.Map;
-import java.util.UUID;
+import com.gist.idea.bar.common.amqp.AmqpTopology;
+import com.gist.idea.bar.common.event.OrderReadyEvent;
+import com.gist.idea.bar.common.event.OrderStatusReportedEvent;
+import com.gist.idea.bar.common.model.OrderStatus;
+import com.gist.idea.bar.desk.domain.Order;
+import com.gist.idea.bar.desk.repository.OrderRepository;
 
 /**
  * Business service orchestrating state aggregation, queries and bill settlements.
@@ -68,22 +68,13 @@ public class DeskService {
                         order.getCorrelationId(),
                         order.getStatus(),
                         order.getItems(),
-                        order.getTotalAmount(),
-                        order.isPaid()
+                        order.getTotalAmount()
                 ))
                 .orElseGet(() -> new OrderStatusReportedEvent(
                         correlationId,
                         OrderStatus.NOT_FOUND,
                         Map.of(),
-                        0.0,
-                        false
+                        0.0
                 ));
-    }
-
-    public ReceiptIssuedEvent settleBill(UUID correlationId, String paymentMethod) {
-        log.info("[Desk] Settling bill for correlationId: {} via {}", correlationId, paymentMethod);
-        Order order = orderRepository.findOrCreate(correlationId);
-        order.markPaid();
-        return new ReceiptIssuedEvent(correlationId, order.getTotalAmount(), true);
     }
 }

@@ -85,21 +85,7 @@ public class OrderController {
             return fromFuture(statusFuture, 6000L, "Order status query timed out.");
         }
 
-        // --- CASE 3: PAY BILL ---
-        if (intents.contains(IntentEnum.PAY_BILL)) {
-            if (request.correlationId() == null) {
-                return immediate(ResponseEntity.badRequest().body("Correlation ID is required to pay the bill."));
-            }
-            UUID correlationId = request.correlationId();
-            CompletableFuture<ReceiptIssuedEvent> receiptFuture = responseTracker.registerReceiptWait(correlationId);
-
-            var payIntent = new PayBillIntentEvent(correlationId, "STANDARD");
-            rabbitTemplate.convertAndSend(AmqpTopology.BAR_EXCHANGE, AmqpTopology.ROUTING_INTENT_PAY_BILL, payIntent);
-
-            return fromFuture(receiptFuture, 6000L, "Payment processing timed out.");
-        }
-
-        // --- CASE 4: ORDER CREATION (Drink, Food, or Both) ---
+        // --- CASE 3: ORDER CREATION (Drink, Food, or Both) ---
         UUID correlationId = request.correlationId() != null ? request.correlationId() : UUID.randomUUID();
         List<IntentEnum> dispatchedIntents = new ArrayList<>();
 

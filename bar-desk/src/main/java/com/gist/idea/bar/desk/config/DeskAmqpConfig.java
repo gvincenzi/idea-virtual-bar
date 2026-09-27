@@ -55,19 +55,6 @@ public class DeskAmqpConfig {
                 .with(AmqpTopology.ROUTING_INTENT_CHECK_STATUS);
     }
 
-    // --- 3. Payment Queue (intent.payBill) ---
-    @Bean
-    public Queue deskPaymentsQueue() {
-        return QueueBuilder.durable(AmqpTopology.QUEUE_DESK_PAYMENTS).build();
-    }
-
-    @Bean
-    public Binding deskPaymentsBinding(Queue deskPaymentsQueue, TopicExchange barExchange) {
-        return BindingBuilder.bind(deskPaymentsQueue)
-                .to(barExchange)
-                .with(AmqpTopology.ROUTING_INTENT_PAY_BILL);
-    }
-
     @Bean
     public MessageConverter messageConverter() {
         return new Jackson2JsonMessageConverter();

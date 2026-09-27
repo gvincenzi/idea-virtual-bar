@@ -69,20 +69,6 @@ public class AmqpConfig {
     }
 
     /**
-     * Binds the receipt issued event routing key to the dispatcher response queue.
-     *
-     * @param dispatcherResponseQueue the response queue bean
-     * @param barExchange the topic exchange bean
-     * @return the created Binding
-     */
-    @Bean
-    public Binding receiptIssuedBinding(Queue dispatcherResponseQueue, TopicExchange barExchange) {
-        return BindingBuilder.bind(dispatcherResponseQueue)
-                .to(barExchange)
-                .with(AmqpTopology.ROUTING_EVENT_RECEIPT_ISSUED);
-    }
-
-    /**
      * Configures Jackson JSON converter for transparent serialization
      * and deserialization of Java records across AMQP queues.
      *

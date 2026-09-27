@@ -4,7 +4,6 @@ public enum OrderStatus {
     RECEIVED,
     IN_PROGRESS,
     READY,
-    PAID,
     NOT_FOUND
 }
 

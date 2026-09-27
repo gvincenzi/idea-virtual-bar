@@ -35,12 +35,6 @@ public enum IntentEnum {
             "await_ready",
             "", // Handled as an in-flight long-poll wait on event.orderReady
             "Customer wants to be notified or wait until the order is completely ready (e.g. 'tell me when ready', 'wait until done', 'alert me when finished')"
-    ),
-
-    PAY_BILL(
-            "pay_bill",
-            AmqpTopology.ROUTING_INTENT_PAY_BILL,
-            "Customer wants the bill, check, receipt, or wants to pay and settle the account"
     );
 
     private final String jevKey;

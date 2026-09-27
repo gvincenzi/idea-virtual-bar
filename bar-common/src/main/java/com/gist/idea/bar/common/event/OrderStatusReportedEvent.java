@@ -12,11 +12,10 @@ public record OrderStatusReportedEvent(
     OrderStatus status,
     Map<String, ItemState> items,
     double totalAmount,
-    boolean paid,
     Instant timestamp
 ) implements DomainEvent {
-    public OrderStatusReportedEvent(UUID correlationId, OrderStatus status, Map<String, ItemState> items, double totalAmount, boolean paid) {
-        this(correlationId, status, items, totalAmount, paid, Instant.now());
+    public OrderStatusReportedEvent(UUID correlationId, OrderStatus status, Map<String, ItemState> items, double totalAmount) {
+        this(correlationId, status, items, totalAmount, Instant.now());
     }
 
     @Override

@@ -1,20 +1,20 @@
 package com.gist.idea.bar.dispatcher.service;
 
-import com.gist.idea.bar.common.amqp.AmqpTopology;
-import com.gist.idea.bar.common.event.OrderReadyEvent;
-import com.gist.idea.bar.common.event.OrderStatusReportedEvent;
-import com.gist.idea.bar.common.event.ReceiptIssuedEvent;
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.amqp.rabbit.annotation.RabbitHandler;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.stereotype.Service;
 
-import java.util.Map;
-import java.util.UUID;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.TimeUnit;
+import com.gist.idea.bar.common.amqp.AmqpTopology;
+import com.gist.idea.bar.common.event.OrderReadyEvent;
+import com.gist.idea.bar.common.event.OrderStatusReportedEvent;
 
 /**
  * Service managing asynchronous response correlation between AMQP return events
@@ -28,7 +28,6 @@ public class ResponseTrackerService {
     private static final long TIMEOUT_SECONDS = 5, TIMEOUT_ORDER_SECONDS=30;
 
     private final Map<UUID, CompletableFuture<OrderStatusReportedEvent>> statusWaiters = new ConcurrentHashMap<>();
-    private final Map<UUID, CompletableFuture<ReceiptIssuedEvent>> receiptWaiters = new ConcurrentHashMap<>();
     private final Map<UUID, CompletableFuture<OrderReadyEvent>> readyWaiters = new ConcurrentHashMap<>();
 
     /**
@@ -76,28 +75,6 @@ public class ResponseTrackerService {
     }
 
     /**
-     * Registers an expectation for a ReceiptIssuedEvent matching the given correlationId.
-     *
-     * @param correlationId unique tracking ID
-     * @return CompletableFuture that will complete when the receipt arrives from AMQP, or timeout
-     */
-    @SuppressWarnings("unused")
-    public CompletableFuture<ReceiptIssuedEvent> registerReceiptWait(UUID correlationId) {
-        log.debug("Registering receipt wait for correlationId: {}", correlationId);
-        CompletableFuture<ReceiptIssuedEvent> future = new CompletableFuture<>();
-        receiptWaiters.put(correlationId, future);
-        return future.orTimeout(TIMEOUT_SECONDS, TimeUnit.SECONDS)
-                .whenComplete((result, ex) -> {
-                    if (ex != null) {
-                        log.warn("FAILED/TIMEOUT receipt wait for correlationId: {} - Error: {}", correlationId, ex.getMessage());
-                    } else {
-                        log.debug("COMPLETE receipt wait for correlationId: {}", correlationId);
-                    }
-                    receiptWaiters.remove(correlationId);
-                });
-    }
-
-    /**
      * AMQP listener handler for status aggregation responses arriving from Desk-Service.
      *
      * @param event the reported status event
@@ -129,19 +106,4 @@ public class ResponseTrackerService {
         }
     }
 
-    /**
-     * AMQP listener handler for receipt issued responses arriving from Desk-Service.
-     *
-     * @param event the issued receipt event
-     */
-    @RabbitHandler
-    public void onReceiptIssued(ReceiptIssuedEvent event) {
-        log.info("Received ReceiptIssuedEvent for correlationId: {}", event.correlationId());
-        CompletableFuture<ReceiptIssuedEvent> future = receiptWaiters.remove(event.correlationId());
-        if (future != null) {
-            future.complete(event);
-        } else {
-            log.warn("Received unexpected or timed-out receipt for correlationId: {}", event.correlationId());
-        }
-    }
 }

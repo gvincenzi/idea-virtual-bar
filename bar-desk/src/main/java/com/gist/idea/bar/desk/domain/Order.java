@@ -52,13 +52,8 @@ public class Order {
         return OrderStatus.READY;
     }
 
-    public synchronized void markPaid() {
-        this.status = OrderStatus.PAID;
-    }
-
     public UUID getCorrelationId() { return correlationId; }
     public Map<String, ItemState> getItems() { return Collections.unmodifiableMap(items); }
     public OrderStatus getStatus() { return status; }
     public double getTotalAmount() { return totalAmount; }
-    public boolean isPaid() { return OrderStatus.PAID.equals(getStatus()); }
 }
