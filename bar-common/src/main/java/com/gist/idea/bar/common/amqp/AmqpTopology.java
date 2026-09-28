@@ -65,6 +65,9 @@ public final class AmqpTopology {
 
     /** Matches all domain completion and failure events (event.*). */
     public static final String ROUTING_PATTERN_ALL_EVENTS   = "event.*";
+    
+    /** Matches all domain ready events (event.*). */
+    public static final String ROUTING_PATTERN_ALL_READY    = "event.*Ready";
 
     // ==========================================
     // QUEUE NAMES

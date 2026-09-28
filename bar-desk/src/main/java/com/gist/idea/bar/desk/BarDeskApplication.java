@@ -18,6 +18,6 @@ public class BarDeskApplication {
 
     public static void main(String[] args) {
         SpringApplication.run(BarDeskApplication.class, args);
-        log.info("Bar-Desk (Read Model & Cashier) successfully started. Listening for events, queries, and payments.");
+        log.info("Bar-Desk (Read Model) successfully started. Listening for events, queries.");
     }
 }

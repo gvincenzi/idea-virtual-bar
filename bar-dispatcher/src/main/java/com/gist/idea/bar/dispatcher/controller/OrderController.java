@@ -28,6 +28,7 @@ import com.gist.idea.bar.common.event.OrderFoodIntentEvent;
 import com.gist.idea.bar.common.event.OrderReadyEvent;
 import com.gist.idea.bar.common.event.OrderStatusReportedEvent;
 import com.gist.idea.bar.common.model.IntentEnum;
+import com.gist.idea.bar.common.model.OrderStatus;
 import com.gist.idea.bar.dispatcher.dto.IntentRequest;
 import com.gist.idea.bar.dispatcher.dto.OrderAcceptedResponse;
 import com.gist.idea.bar.dispatcher.service.IntentClassifier;
@@ -69,17 +70,44 @@ public class OrderController {
         Set<IntentEnum> intents = result.detectedIntents();
         log.info("[Spike Decision] Detected intents: {}", intents);
 
-        // --- CASE 1: AWAIT READY (Long-poll intent) ---
+        // --- CASE 1: AWAIT READY (Long-poll with pre-flight check, consistent response) ---
         if (intents.contains(IntentEnum.AWAIT_READY)) {
             if (request.correlationId() == null) {
                 return immediate(ResponseEntity.badRequest().body("Correlation ID is required to await order completion."));
             }
             UUID correlationId = request.correlationId();
-            log.info("[Spike Long-Poll] Client awaiting completion for correlationId: {}", correlationId);
+            log.info("[Spike Long-Poll] Client requested await for correlationId: {}", correlationId);
 
-            CompletableFuture<OrderReadyEvent> readyFuture = responseTracker.registerReadyWait(correlationId);
-            return fromFuture(readyFuture, 32000L, "Order is still in preparation. Please retry or check status.");
+            // Step 1: Pre-flight check via Desk
+            CompletableFuture<OrderStatusReportedEvent> statusFuture = responseTracker.registerStatusWait(correlationId);
+            var queryEvent = new CheckStatusIntentEvent(correlationId);
+            rabbitTemplate.convertAndSend(AmqpTopology.BAR_EXCHANGE, AmqpTopology.ROUTING_INTENT_CHECK_STATUS, queryEvent);
+
+            // Step 2: Compose decision
+            CompletableFuture<OrderStatusReportedEvent> awaitFlowFuture = statusFuture.thenCompose(currentStatus -> {
+                log.info("[Spike Long-Poll] Current state for {}: {}", correlationId, currentStatus.status());
+
+                // If already terminal, return the status report directly!
+                if (currentStatus.status() == OrderStatus.READY) {
+                    return CompletableFuture.completedFuture(currentStatus);
+                }
+                if (currentStatus.status() == OrderStatus.FAILED || currentStatus.status() == OrderStatus.NOT_FOUND) {
+                    return CompletableFuture.completedFuture(currentStatus);
+                }
+
+                // If IN_PROGRESS: wait for OrderReadyEvent, then query final consolidated status
+                return responseTracker.registerReadyWait(correlationId)
+                        .thenCompose(readyEvent -> {
+                            // Query final state to return the complete OrderStatusReportedEvent (items + total)
+                            CompletableFuture<OrderStatusReportedEvent> finalStatusFuture = responseTracker.registerStatusWait(correlationId);
+                            rabbitTemplate.convertAndSend(AmqpTopology.BAR_EXCHANGE, AmqpTopology.ROUTING_INTENT_CHECK_STATUS, new CheckStatusIntentEvent(correlationId));
+                            return finalStatusFuture;
+                        });
+            });
+
+            return fromFuture(awaitFlowFuture, 35000L, "Order is still in preparation. Please retry or check status.");
         }
+
 
         // --- CASE 2: STATUS QUERY ---
         if (intents.contains(IntentEnum.CHECK_STATUS)) {

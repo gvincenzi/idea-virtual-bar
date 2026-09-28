@@ -46,16 +46,23 @@ public final class DeferredResultHelper {
                 ResponseEntity.status(HttpStatus.REQUEST_TIMEOUT).body(timeoutPayload)
         ));
 
-        future.thenAccept(result -> deferred.setResult(ResponseEntity.ok(result)))
-              .exceptionally(ex -> {
-                  if (!deferred.isSetOrExpired()) {
-                      deferred.setErrorResult(
-                              ResponseEntity.status(HttpStatus.GATEWAY_TIMEOUT).body(ex.getMessage())
-                      );
-                  }
-                  return null;
-              });
+        future.thenAccept(result -> {
+            // if result is already a ResponseEntity we don't need to re-encapsulate
+            if (result instanceof ResponseEntity<?> responseEntity) {
+                deferred.setResult(responseEntity);
+            } else {
+                deferred.setResult(ResponseEntity.ok(result));
+            }
+        }).exceptionally(ex -> {
+            if (!deferred.isSetOrExpired()) {
+                deferred.setErrorResult(
+                        ResponseEntity.status(HttpStatus.GATEWAY_TIMEOUT).body(ex.getMessage())
+                );
+            }
+            return null;
+        });
 
         return deferred;
     }
+
 }

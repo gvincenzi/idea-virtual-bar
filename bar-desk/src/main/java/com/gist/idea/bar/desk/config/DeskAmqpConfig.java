@@ -26,20 +26,44 @@ public class DeskAmqpConfig {
         return QueueBuilder.durable(AmqpTopology.QUEUE_DESK_EVENTS).build();
     }
 
-    // Binding 1: drinkReady, foodReady, itemFailed
+    // Binding Drink Ready
     @Bean
-    public Binding deskWorkerEventsBinding(Queue deskEventsQueue, TopicExchange barExchange) {
+    public Binding deskDrinkReadyBinding(Queue deskEventsQueue, TopicExchange barExchange) {
         return BindingBuilder.bind(deskEventsQueue)
                 .to(barExchange)
-                .with(AmqpTopology.ROUTING_PATTERN_ALL_EVENTS);
+                .with(AmqpTopology.ROUTING_EVENT_DRINK_READY); // "event.drinkReady"
     }
 
-    // Binding 2: intent.orderDrink, intent.orderFood
+    // Binding Food Ready
+    @Bean
+    public Binding deskFoodReadyBinding(Queue deskEventsQueue, TopicExchange barExchange) {
+        return BindingBuilder.bind(deskEventsQueue)
+                .to(barExchange)
+                .with(AmqpTopology.ROUTING_EVENT_FOOD_READY);  // "event.foodReady"
+    }
+
+    // Binding Item Failed
+    @Bean
+    public Binding deskItemFailedBinding(Queue deskEventsQueue, TopicExchange barExchange) {
+        return BindingBuilder.bind(deskEventsQueue)
+                .to(barExchange)
+                .with(AmqpTopology.ROUTING_EVENT_ITEM_FAILED); // "event.itemFailed"
+    }
+
+
+    @Bean
+    public Binding deskWorkerFailedEventsBinding(Queue deskEventsQueue, TopicExchange barExchange) {
+        return BindingBuilder.bind(deskEventsQueue)
+                .to(barExchange)
+                .with(AmqpTopology.ROUTING_EVENT_ITEM_FAILED); // "event.itemFailed"
+    }
+
+    // Binding : intent.orderDrink, intent.orderFood
     @Bean
     public Binding deskOrderIntentsBinding(Queue deskEventsQueue, TopicExchange barExchange) {
         return BindingBuilder.bind(deskEventsQueue)
                 .to(barExchange)
-                .with(AmqpTopology.ROUTING_PATTERN_ALL_ORDERS);
+                .with(AmqpTopology.ROUTING_PATTERN_ALL_ORDERS); // "intent.order*"
     }
 
     // --- 2. Query Queue (intent.checkStatus) ---
