@@ -86,25 +86,24 @@ public class OrderController {
             CompletableFuture<OrderStatusReportedEvent> awaitFlowFuture = statusFuture.thenCompose(currentStatus -> {
                 log.info("[Spike Long-Poll] Current state for {}: {}", correlationId, currentStatus.status());
 
-                // If already terminal, return the status report directly!
+                // Exit Only if READY o FAILED
                 if (currentStatus.status() == OrderStatus.READY) {
                     return CompletableFuture.completedFuture(currentStatus);
                 }
-                if (currentStatus.status() == OrderStatus.FAILED || currentStatus.status() == OrderStatus.NOT_FOUND) {
+                if (currentStatus.status() == OrderStatus.FAILED) {
                     return CompletableFuture.completedFuture(currentStatus);
                 }
 
-                // If IN_PROGRESS: wait for OrderReadyEvent, then query final consolidated status
                 return responseTracker.registerReadyWait(correlationId)
                         .thenCompose(readyEvent -> {
-                            // Query final state to return the complete OrderStatusReportedEvent (items + total)
+                            // Quando arriva OrderReadyEvent, facciamo la query finale al Desk per avere la foto completa
                             CompletableFuture<OrderStatusReportedEvent> finalStatusFuture = responseTracker.registerStatusWait(correlationId);
                             rabbitTemplate.convertAndSend(AmqpTopology.BAR_EXCHANGE, AmqpTopology.ROUTING_INTENT_CHECK_STATUS, new CheckStatusIntentEvent(correlationId));
                             return finalStatusFuture;
                         });
             });
 
-            return fromFuture(awaitFlowFuture, 35000L, "Order is still in preparation. Please retry or check status.");
+            return fromFuture(awaitFlowFuture, 35000L, "Order not found or still in preparation. Please retry or check status.");
         }
 
 
