@@ -13,6 +13,7 @@ import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.stereotype.Service;
 
 import com.gist.idea.bar.common.amqp.AmqpTopology;
+import com.gist.idea.bar.common.event.OrderFailedEvent;
 import com.gist.idea.bar.common.event.OrderReadyEvent;
 import com.gist.idea.bar.common.event.OrderStatusReportedEvent;
 
@@ -36,7 +37,6 @@ public class ResponseTrackerService {
      * @param correlationId unique tracking ID
      * @return CompletableFuture that will complete when the event arrives from AMQP, or timeout
      */
-    @SuppressWarnings("unused")
     public CompletableFuture<OrderStatusReportedEvent> registerStatusWait(UUID correlationId) {
         log.debug("Registering status wait for correlationId: {}", correlationId);
         CompletableFuture<OrderStatusReportedEvent> future = new CompletableFuture<>();
@@ -58,7 +58,6 @@ public class ResponseTrackerService {
      * @param correlationId unique tracking ID
      * @return CompletableFuture that will complete when the order ready event arrives from AMQP, or timeout
      */
-    @SuppressWarnings("unused")
     public CompletableFuture<OrderReadyEvent> registerReadyWait(UUID correlationId) {
         log.debug("Registering await-ready wait for correlationId: {}", correlationId);
         CompletableFuture<OrderReadyEvent> future = new CompletableFuture<>();
@@ -105,5 +104,27 @@ public class ResponseTrackerService {
             log.debug("No active await-ready waiter for correlationId: {}", event.correlationId());
         }
     }
+    
+    /**
+     * AMQP listener handler for order failure events arriving from Desk-Service.
+     * Immediately unblocks waiting clients with a failure outcome.
+     *
+     * @param event the order failed event
+     */
+    @RabbitHandler
+    public void onOrderFailed(OrderFailedEvent event) {
+        log.warn("Received OrderFailedEvent for correlationId: {} (reason: '{}')",
+                event.correlationId(), event.reason());
+
+        CompletableFuture<OrderReadyEvent> readyFuture = readyWaiters.remove(event.correlationId());
+        if (readyFuture != null) {
+            readyFuture.completeExceptionally(
+                new IllegalStateException("Order processing failed: " + event.reason())
+            );
+        } else {
+            log.debug("No active await-ready waiter for failed correlationId: {}", event.correlationId());
+        }
+    }
+
 
 }

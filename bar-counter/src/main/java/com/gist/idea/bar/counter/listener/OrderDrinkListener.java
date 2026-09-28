@@ -4,6 +4,7 @@ import com.gist.idea.bar.common.amqp.AmqpTopology;
 import com.gist.idea.bar.common.event.DrinkReadyEvent;
 import com.gist.idea.bar.common.event.ItemFailedEvent;
 import com.gist.idea.bar.common.event.OrderDrinkIntentEvent;
+import com.gist.idea.bar.common.model.IntentEnum;
 import com.gist.idea.bar.counter.service.DrinkPreparationService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -20,7 +21,6 @@ import org.springframework.stereotype.Component;
 public class OrderDrinkListener {
 
     private static final Logger log = LoggerFactory.getLogger(OrderDrinkListener.class);
-    private static final String WORKER_NAME = "COUNTER";
 
     private final DrinkPreparationService preparationService;
     private final RabbitTemplate rabbitTemplate;
@@ -58,7 +58,7 @@ public class OrderDrinkListener {
                     event.correlationId(),
                     event.item(),
                     ex.getMessage(),
-                    WORKER_NAME
+                    IntentEnum.ORDER_DRINK
             );
             rabbitTemplate.convertAndSend(
                     AmqpTopology.BAR_EXCHANGE,

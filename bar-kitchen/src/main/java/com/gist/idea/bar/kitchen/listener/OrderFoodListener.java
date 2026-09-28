@@ -1,16 +1,18 @@
 package com.gist.idea.bar.kitchen.listener;
 
-import com.gist.idea.bar.common.amqp.AmqpTopology;
-import com.gist.idea.bar.common.event.FoodReadyEvent;
-import com.gist.idea.bar.common.event.ItemFailedEvent;
-import com.gist.idea.bar.common.event.OrderFoodIntentEvent;
-import com.gist.idea.bar.kitchen.service.FoodPreparationService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.amqp.rabbit.annotation.RabbitHandler;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.stereotype.Component;
+
+import com.gist.idea.bar.common.amqp.AmqpTopology;
+import com.gist.idea.bar.common.event.FoodReadyEvent;
+import com.gist.idea.bar.common.event.ItemFailedEvent;
+import com.gist.idea.bar.common.event.OrderFoodIntentEvent;
+import com.gist.idea.bar.common.model.IntentEnum;
+import com.gist.idea.bar.kitchen.service.FoodPreparationService;
 
 /**
  * AMQP listener consuming food order intents and dispatching outcome domain events.
@@ -20,7 +22,6 @@ import org.springframework.stereotype.Component;
 public class OrderFoodListener {
 
     private static final Logger log = LoggerFactory.getLogger(OrderFoodListener.class);
-    private static final String WORKER_NAME = "KITCHEN";
 
     private final FoodPreparationService preparationService;
     private final RabbitTemplate rabbitTemplate;
@@ -58,7 +59,7 @@ public class OrderFoodListener {
                     event.correlationId(),
                     event.item(),
                     ex.getMessage(),
-                    WORKER_NAME
+                    IntentEnum.ORDER_FOOD
             );
             rabbitTemplate.convertAndSend(
                     AmqpTopology.BAR_EXCHANGE,

@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IDEA - Virtual Bar Molecule Console</title>
+    <style>
+        :root {
+            --bg: #0f172a;
+            --card-bg: #1e293b;
+            --border: #334155;
+            --text: #f8fafc;
+            --text-muted: #94a3b8;
+            --primary: #3b82f6;
+            --primary-hover: #2563eb;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --tag-bg: #334155;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg);
+            color: var(--text);
+            padding: 2rem;
+            display: flex;
+            justify-content: center;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 950px;
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+
+        header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 1rem;
+        }
+
+        header h1 {
+            font-size: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .card {
+            background-color: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1.25rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .card-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        input[type="text"] {
+            width: 100%;
+            background-color: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 0.75rem;
+            color: var(--text);
+            font-size: 1rem;
+            outline: none;
+        }
+
+        input[type="text"]:focus {
+            border-color: var(--primary);
+        }
+
+        .quick-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+        }
+
+        .quick-btn {
+            background-color: var(--tag-bg);
+            border: 1px solid var(--border);
+            color: var(--text-muted);
+            border-radius: 4px;
+            padding: 0.35rem 0.6rem;
+            font-size: 0.75rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .quick-btn:hover {
+            color: var(--text);
+            border-color: var(--primary);
+        }
+
+        .submit-btn {
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            padding: 0.75rem;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        .submit-btn:hover { background-color: var(--primary-hover); }
+        .submit-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        .workers-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+        }
+
+        @media (max-width: 650px) {
+            .workers-grid { grid-template-columns: 1fr; }
+        }
+
+        .worker-card {
+            background-color: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 1rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+            transition: border-color 0.3s, box-shadow 0.3s;
+        }
+
+        .worker-card.working {
+            border-color: var(--warning);
+            box-shadow: 0 0 10px rgba(245, 158, 11, 0.15);
+        }
+
+        .worker-card.completed {
+            border-color: var(--success);
+            box-shadow: 0 0 10px rgba(16, 185, 129, 0.15);
+        }
+
+        .worker-card.failed {
+            border-color: var(--danger);
+            box-shadow: 0 0 10px rgba(239, 68, 68, 0.15);
+        }
+
+        .worker-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .worker-name {
+            font-weight: 600;
+            font-size: 0.95rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .worker-status {
+            font-size: 0.75rem;
+            font-weight: 700;
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+            text-transform: uppercase;
+        }
+
+        .worker-progress-bar {
+            height: 4px;
+            background-color: var(--border);
+            border-radius: 2px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .worker-progress-fill {
+            height: 100%;
+            width: 0%;
+            background-color: var(--primary);
+            transition: width 0.3s ease;
+        }
+
+        .working .worker-progress-fill {
+            width: 60%;
+            background-color: var(--warning);
+            animation: pulse-progress 1.5s infinite;
+        }
+
+        .completed .worker-progress-fill {
+            width: 100% !important;
+            background-color: var(--success);
+        }
+
+        .failed .worker-progress-fill {
+            width: 100% !important;
+            background-color: var(--danger);
+        }
+
+        @keyframes pulse-progress {
+            0% { opacity: 0.6; }
+            50% { opacity: 1; }
+            100% { opacity: 0.6; }
+        }
+
+        .worker-item {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            font-style: italic;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+
+        .badge-idle { background: #334155; color: #94a3b8; }
+        .badge-working { background: #78350f; color: #fde68a; }
+        .badge-ready { background: #064e3b; color: #6ee7b7; }
+        .badge-failed { background: #7f1d1d; color: #fca5a5; }
+
+        .log-box {
+            background-color: #000;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 0.75rem;
+            font-family: monospace;
+            font-size: 0.8rem;
+            color: #38bdf8;
+            max-height: 150px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <div>
+            <h1>☕ IDEA Virtual Bar Molecule Console</h1>
+            <div style="color: var(--text-muted); font-size: 0.875rem;">Intent-Driven Architecture Live Observability Laboratory</div>
+        </div>
+        <span class="badge badge-ready">Molecule Online</span>
+    </header>
+
+    <!-- INTAKE CARD -->
+    <div class="card">
+        <div class="card-title">
+            <span>Natural Language Ingestion</span>
+            <span style="font-size: 0.8rem; color: var(--text-muted);">POST /intent (Spike Gateway)</span>
+        </div>
+
+        <input type="text" id="intentInput" placeholder="e.g. I would like a cappuccino and a croissant..." autofocus>
+        <input type="text" id="correlationInput" placeholder="Correlation ID (optional if already active)..." style="font-size: 0.85rem;">
+
+		<div class="quick-actions">
+		    <span style="font-size: 0.75rem; color: var(--text-muted); align-self: center;">Quick tests:</span>
+		    <button class="quick-btn" onclick="setOrderIntent('I would like a cappuccino and a croissant')">☕🥐 Compound Order (Fan-out)</button>
+		    <button class="quick-btn" onclick="setOrderIntent('Just an espresso coffee')">☕ Drink Only</button>
+		    <button class="quick-btn" onclick="setOrderIntent('A cheese toast')">🥪 Food Only</button>
+		    <button class="quick-btn" onclick="setOrderIntent('A coffee and a bottle of champagne')">⚠️ Simulate Failure</button>
+		    <button class="quick-btn" onclick="resetSession()" style="border-color: var(--danger); color: #fca5a5;">🔄 Reset / New Order</button>
+		</div>
+
+        <button class="submit-btn" id="sendBtn" onclick="dispatchIntent()">Dispatch Intent to Molecule</button>
+    </div>
+
+    <!-- WORKERS LIVE MONITOR CARD -->
+    <div class="card">
+        <div class="card-title">
+            <span>Worker Microservices Live Telemetry</span>
+            <span id="orderGlobalBadge"><span class="badge badge-idle">MOLECULE IDLE</span></span>
+        </div>
+
+        <div style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.25rem;">
+            Correlation ID: <strong id="dispCorrelation" style="color: var(--text); font-family: monospace;">none</strong>
+        </div>
+
+        <div class="workers-grid">
+            <!-- Counter-Service Card -->
+            <div class="worker-card" id="cardCounter">
+                <div class="worker-header">
+                    <span class="worker-name">☕ Bar-Counter (Drink Worker)</span>
+                    <span class="worker-status badge badge-idle" id="badgeCounter">IDLE</span>
+                </div>
+                <div class="worker-item" id="itemCounter">Awaiting intents...</div>
+                <div class="worker-progress-bar">
+                    <div class="worker-progress-fill" id="progressCounter"></div>
+                </div>
+            </div>
+
+            <!-- Kitchen-Service Card -->
+            <div class="worker-card" id="cardKitchen">
+                <div class="worker-header">
+                    <span class="worker-name">🥐 Bar-Kitchen (Food Worker)</span>
+                    <span class="worker-status badge badge-idle" id="badgeKitchen">IDLE</span>
+                </div>
+                <div class="worker-item" id="itemKitchen">Awaiting intents...</div>
+                <div class="worker-progress-bar">
+                    <div class="worker-progress-fill" id="progressKitchen"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- LOG BOX -->
+    <div class="card">
+        <div class="card-title">
+            <span>Trace & Event Log</span>
+            <button class="quick-btn" onclick="clearLogs()">Clear</button>
+        </div>
+        <div class="log-box" id="logBox">Console initialized. Dispatch an intent to initiate the lifecycle.</div>
+    </div>
+</div>
+
+<script>
+    let activeCorrelationId = null;
+    let telemetryInterval = null;
+
+    function log(msg) {
+        const box = document.getElementById('logBox');
+        const ts = new Date().toISOString().substring(11, 19);
+        box.textContent = `[${ts}] ${msg}\n` + box.textContent;
+    }
+
+    function clearLogs() {
+        document.getElementById('logBox').textContent = "";
+    }
+
+    // New order presets: ALWAYS reset previous correlationId!
+    function setOrderIntent(text) {
+        resetSession();
+        document.getElementById('intentInput').value = text;
+    }
+
+    function resetSession() {
+        activeCorrelationId = null;
+        document.getElementById('correlationInput').value = "";
+        document.getElementById('dispCorrelation').textContent = "none";
+        resetWorkerUI();
+    }
+
+    async function dispatchIntent() {
+        const message = document.getElementById('intentInput').value.trim();
+        // If the user didn't type an ID manually, send null to let the Spike mint a fresh one!
+        const correlationId = document.getElementById('correlationInput').value.trim() || null;
+        const sendBtn = document.getElementById('sendBtn');
+
+        if (!message) return;
+
+        sendBtn.disabled = true;
+        
+        // Stop any orphan intervals from previous runs
+        if (telemetryInterval) {
+            clearInterval(telemetryInterval);
+            telemetryInterval = null;
+        }
+
+        log(`-> Ingesting intent: "${message}" ${correlationId ? `[correlationId: ${correlationId}]` : '[NEW ORDER]'}`);
+
+        try {
+            const response = await fetch('/intent', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ message, correlationId })
+            });
+
+            const data = await response.json();
+            log(`<- Spike response (${response.status}): ${JSON.stringify(data)}`);
+
+            if (response.status === 202) {
+                // Brand new order initiated!
+                activeCorrelationId = data.correlationId;
+                document.getElementById('dispCorrelation').textContent = activeCorrelationId;
+                document.getElementById('correlationInput').value = activeCorrelationId;
+
+                const intents = data.classifiedIntents || data.dispatchedIntents || [];
+                setupWorkersFromIntents(intents);
+
+                // Start light telemetry polling every 500ms
+                startTelemetryPolling(activeCorrelationId);
+
+                // Start reactive await long-poll
+                triggerAwaitReady(activeCorrelationId);
+            } else if (response.status === 200) {
+                // Snapshot check or direct resolution
+                if (data.items) {
+                    applyItemsToUI(data.items);
+                }
+                setGlobalBadge(data.status, data.status === 'READY' ? 'badge-ready' : 'badge-working');
+            }
+        } catch (err) {
+            log(`<!> Error: ${err.message}`);
+        } finally {
+            sendBtn.disabled = false;
+        }
+    }
+
+    function setupWorkersFromIntents(intents) {
+        setGlobalBadge('IN_PROGRESS', 'badge-working');
+
+        const hasDrink = intents.some(i => i.includes('ORDER_DRINK'));
+        const hasFood  = intents.some(i => i.includes('ORDER_FOOD'));
+
+        if (hasDrink) {
+            setWorkerState('Counter', 'working', 'badge-working', 'BREWING...', 'Preparing beverage');
+        } else {
+            setWorkerState('Counter', '', 'badge-idle', 'NOT INVOLVED', '-');
+        }
+
+        if (hasFood) {
+            setWorkerState('Kitchen', 'working', 'badge-working', 'BAKING...', 'Baking food item');
+        } else {
+            setWorkerState('Kitchen', '', 'badge-idle', 'NOT INVOLVED', '-');
+        }
+    }
+
+    function startTelemetryPolling(correlationId) {
+        if (telemetryInterval) clearInterval(telemetryInterval);
+
+        telemetryInterval = setInterval(async () => {
+            try {
+                const res = await fetch('/intent', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: "What is the status of my order?", correlationId })
+                });
+
+                if (res.status === 200) {
+                    const data = await res.json();
+                    applyItemsToUI(data.items);
+
+                    if (data.status === 'READY' || data.status === 'FAILED') {
+                        clearInterval(telemetryInterval);
+                        telemetryInterval = null;
+                    }
+                }
+            } catch (e) {
+                // Ignore transient network errors
+            }
+        }, 500);
+    }
+
+    async function triggerAwaitReady(correlationId) {
+        try {
+            log(`[AWAIT_READY] Reactive connection suspended on Spike for ${correlationId}...`);
+            const res = await fetch('/intent', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ message: "Please notify me when everything is ready", correlationId })
+            });
+
+            const data = await res.json();
+            
+            if (telemetryInterval) {
+                clearInterval(telemetryInterval);
+                telemetryInterval = null;
+            }
+
+            if (res.status === 200 && data.status === 'READY') {
+                log(`[AWAIT_READY Resolved] Order fully completed!`);
+                setGlobalBadge('ORDER COMPLETED (READY)', 'badge-ready');
+            } else {
+                log(`[AWAIT_READY Resolved] Order finished with status: ${data.status}`);
+                setGlobalBadge(data.status, 'badge-failed');
+            }
+
+            if (data.items) {
+                applyItemsToUI(data.items);
+            }
+        } catch (err) {
+            log(`[AWAIT_READY Error/Timeout] ${err.message}`);
+        }
+    }
+
+    function applyItemsToUI(items) {
+        if (!items) return;
+
+        for (const [key, state] of Object.entries(items)) {
+            const isDrink = key.includes('ORDER_DRINK');
+            const isFood  = key.includes('ORDER_FOOD');
+            const worker  = isDrink ? 'Counter' : (isFood ? 'Kitchen' : null);
+
+            if (!worker) continue;
+
+            if (state === 'READY') {
+                setWorkerState(worker, 'completed', 'badge-ready', 'READY', isDrink ? 'Beverage ready' : 'Food ready');
+            } else if (state === 'FAILED') {
+                setWorkerState(worker, 'failed', 'badge-failed', 'FAILED', 'Item out of stock / failed');
+            } else if (state === 'ORDERED' || state === 'PREPARING') {
+                setWorkerState(worker, 'working', 'badge-working', isDrink ? 'BREWING...' : 'BAKING...', 'In preparation');
+            }
+        }
+    }
+
+    function setWorkerState(worker, cardClass, badgeClass, statusText, itemText) {
+        const card = document.getElementById(`card${worker}`);
+        const badge = document.getElementById(`badge${worker}`);
+        const item = document.getElementById(`item${worker}`);
+
+        if (!card || !badge || !item) return;
+
+        card.className = `worker-card ${cardClass}`;
+        badge.className = `worker-status badge ${badgeClass}`;
+        badge.textContent = statusText;
+        if (itemText) item.textContent = itemText;
+    }
+
+    function setGlobalBadge(text, badgeClass) {
+        const el = document.getElementById('orderGlobalBadge');
+        el.innerHTML = `<span class="badge ${badgeClass}">${text}</span>`;
+    }
+
+    function resetWorkerUI() {
+        if (telemetryInterval) {
+            clearInterval(telemetryInterval);
+            telemetryInterval = null;
+        }
+        setGlobalBadge('MOLECULE IDLE', 'badge-idle');
+        setWorkerState('Counter', '', 'badge-idle', 'IDLE', 'Awaiting intents...');
+        setWorkerState('Kitchen', '', 'badge-idle', 'IDLE', 'Awaiting intents...');
+    }
+</script>
+
+
+</body>
+</html>

@@ -22,10 +22,10 @@ public class RuleBasedIntentClassifier implements IntentClassifier {
     private static final String SOURCE = "RULE_BASED_FALLBACK";
 
     private final Map<IntentEnum, Pattern> intentPatterns = Map.of(
-        IntentEnum.ORDER_DRINK, Pattern.compile("(?i).*(caff[eè]|espresso|cappuccino|t[eè]|tea|coffee|water|acqua|drink|succo|latte).*"),
-        IntentEnum.ORDER_FOOD, Pattern.compile("(?i).*(croissant|brioche|panino|toast|sandwich|cake|torta|food|muffin|snack).*"),
-        IntentEnum.CHECK_STATUS, Pattern.compile("(?i).*(status|stato|punto|progress|pronto|ready\\?|waiting).*"),
-        IntentEnum.AWAIT_READY, Pattern.compile("(?i).*(avvisami|notify|wait|aspett.*|alert.*|dimmi quando).*")
+    		IntentEnum.ORDER_DRINK, Pattern.compile("(?i).*(caff[eèé]|espresso|cappuccino|t[eèé]|tea|coffee|water|acqua|drink|succo|latte).*"),
+            IntentEnum.ORDER_FOOD, Pattern.compile("(?i).*(croissant|brioche|panin[oi]|toast|sandwich|cake|torta|food|muffin|snack).*"),
+            IntentEnum.CHECK_STATUS, Pattern.compile("(?i).*(status|stato|punto|progress|pronto|pronta|ready|waiting).*"),
+            IntentEnum.AWAIT_READY, Pattern.compile("(?i).*(avvisami|notify|wait|aspett.*|alert.*|dimmi quando).*")
     );
 
     @Override

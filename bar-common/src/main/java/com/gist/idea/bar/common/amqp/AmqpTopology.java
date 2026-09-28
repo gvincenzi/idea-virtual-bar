@@ -60,15 +60,9 @@ public final class AmqpTopology {
     // WILDCARD PATTERNS (Used for Queue Bindings)
     // ==========================================
 
-    /** Matches all order intents (intent.orderDrink, intent.orderFood). */
-    public static final String ROUTING_PATTERN_ALL_ORDERS   = "intent.order*";
-
     /** Matches all domain completion and failure events (event.*). */
     public static final String ROUTING_PATTERN_ALL_EVENTS   = "event.*";
     
-    /** Matches all domain ready events (event.*). */
-    public static final String ROUTING_PATTERN_ALL_READY    = "event.*Ready";
-
     // ==========================================
     // QUEUE NAMES
     // ==========================================

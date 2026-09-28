@@ -58,12 +58,20 @@ public class DeskAmqpConfig {
                 .with(AmqpTopology.ROUTING_EVENT_ITEM_FAILED); // "event.itemFailed"
     }
 
-    // Binding : intent.orderDrink, intent.orderFood
+    // Binding Drink
     @Bean
-    public Binding deskOrderIntentsBinding(Queue deskEventsQueue, TopicExchange barExchange) {
+    public Binding deskOrderDrinkBinding(Queue deskEventsQueue, TopicExchange barExchange) {
         return BindingBuilder.bind(deskEventsQueue)
                 .to(barExchange)
-                .with(AmqpTopology.ROUTING_PATTERN_ALL_ORDERS); // "intent.order*"
+                .with(AmqpTopology.ROUTING_INTENT_ORDER_DRINK);
+    }
+
+    // Binding Food
+    @Bean
+    public Binding deskOrderFoodBinding(Queue deskEventsQueue, TopicExchange barExchange) {
+        return BindingBuilder.bind(deskEventsQueue)
+                .to(barExchange)
+                .with(AmqpTopology.ROUTING_INTENT_ORDER_FOOD);
     }
 
     // --- 2. Query Queue (intent.checkStatus) ---

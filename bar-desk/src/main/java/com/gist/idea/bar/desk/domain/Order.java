@@ -1,5 +1,6 @@
 package com.gist.idea.bar.desk.domain;
 
+import com.gist.idea.bar.common.model.IntentEnum;
 import com.gist.idea.bar.common.model.ItemState;
 import com.gist.idea.bar.common.model.OrderStatus;
 
@@ -10,8 +11,8 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Order aggregate tracking item lifecycle.
- * Immune to out-of-order event arrivals and duplicate deliveries.
+ * Order aggregate tracking intent lifecycles.
+ * Items are indexed by composite key: IntentEnum.name() + ":" + correlationId.
  */
 public class Order {
 
@@ -24,27 +25,24 @@ public class Order {
         this.status = OrderStatus.RECEIVED;
     }
 
-    /**
-     * Registers an incoming order intent.
-     * If a ready or failed event arrived out-of-order BEFORE this intent,
-     * the existing state is preserved and NOT regressed.
-     */
-    public synchronized void recordItemOrdered(String item) {
-        items.compute(item, (key, currentState) -> {
+    private String buildKey(IntentEnum intent) {
+        return intent.name() + ":" + correlationId;
+    }
+
+    public synchronized void recordItemOrdered(IntentEnum intent) {
+        String key = buildKey(intent);
+        items.compute(key, (k, currentState) -> {
             if (currentState == null) {
                 return ItemState.ORDERED;
             }
-            // State already exists (e.g. READY arrived early): do NOT regress to ORDERED
-            return currentState;
+            return currentState; // Monotonic: does not regress if READY arrived early
         });
         this.status = checkOrderReady(this.items);
     }
 
-    /**
-     * Transitions an item to READY.
-     */
-    public synchronized void recordItemReady(String item) {
-        items.compute(item, (key, currentState) -> {
+    public synchronized void recordItemReady(IntentEnum intent) {
+        String key = buildKey(intent);
+        items.compute(key, (k, currentState) -> {
             if (currentState == null || currentState.canTransitionTo(ItemState.READY)) {
                 return ItemState.READY;
             }
@@ -53,11 +51,9 @@ public class Order {
         this.status = checkOrderReady(this.items);
     }
 
-    /**
-     * Transitions an item to FAILED.
-     */
-    public synchronized void recordItemFailed(String item) {
-        items.compute(item, (key, currentState) -> {
+    public synchronized void recordItemFailed(IntentEnum intent) {
+        String key = buildKey(intent);
+        items.compute(key, (k, currentState) -> {
             if (currentState == null || currentState.canTransitionTo(ItemState.FAILED)) {
                 return ItemState.FAILED;
             }
@@ -68,22 +64,11 @@ public class Order {
 
     private static OrderStatus checkOrderReady(Map<String, ItemState> items) {
         if (items.isEmpty()) return OrderStatus.RECEIVED;
-
-        boolean hasFailures = false;
-        boolean allReady = true;
-
         for (Entry<String, ItemState> entry : items.entrySet()) {
-            if (entry.getValue() == ItemState.FAILED) {
-                hasFailures = true;
-            }
-            if (entry.getValue() != ItemState.READY) {
-                allReady = false;
-            }
+            if (entry.getValue() == ItemState.FAILED) return OrderStatus.FAILED;
+            if (entry.getValue() != ItemState.READY) return OrderStatus.IN_PROGRESS;
         }
-
-        if (hasFailures) return OrderStatus.FAILED;
-        if (allReady) return OrderStatus.READY;
-        return OrderStatus.IN_PROGRESS;
+        return OrderStatus.READY;
     }
 
     public UUID getCorrelationId() { return correlationId; }
