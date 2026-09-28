@@ -1,0 +1,9 @@
+spring:
+  application:
+    name: bar-kitchen
+  rabbitmq:
+    addresses: ${LAVINMQ_URL:amqp://guest:guest@localhost:5672/}
+
+logging:
+  level:
+    com.gist.idea.bar: DEBUG
