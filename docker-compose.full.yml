@@ -1,0 +1,79 @@
+version: '3.8'
+
+services:
+  lavinmq:
+    image: cloudamqp/lavinmq:latest
+    container_name: bar-lavinmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      - LAVINMQ_DEFAULT_USER=guest
+      - LAVINMQ_DEFAULT_PASS=guest
+    healthcheck:
+      test: ["CMD", "lavinmqctl", "status"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - bar-network
+
+  bar-dispatcher:
+    build:
+      context: .
+      dockerfile: bar-dispatcher/Dockerfile
+    container_name: bar-dispatcher
+    ports:
+      - "8080:8080"
+    environment:
+      - LAVINMQ_URL=amqp://guest:guest@lavinmq:5672/
+      - JEV_ENABLED=${JEV_ENABLED:-false}
+      - JEV_API_KEY=${JEV_API_KEY:-disabled}
+    depends_on:
+      lavinmq:
+        condition: service_healthy
+    networks:
+      - bar-network
+
+  bar-counter:
+    build:
+      context: .
+      dockerfile: bar-counter/Dockerfile
+    container_name: bar-counter
+    environment:
+      - LAVINMQ_URL=amqp://guest:guest@lavinmq:5672/
+    depends_on:
+      lavinmq:
+        condition: service_healthy
+    networks:
+      - bar-network
+
+  bar-kitchen:
+    build:
+      context: .
+      dockerfile: bar-kitchen/Dockerfile
+    container_name: bar-kitchen
+    environment:
+      - LAVINMQ_URL=amqp://guest:guest@lavinmq:5672/
+    depends_on:
+      lavinmq:
+        condition: service_healthy
+    networks:
+      - bar-network
+
+  bar-desk:
+    build:
+      context: .
+      dockerfile: bar-desk/Dockerfile
+    container_name: bar-desk
+    environment:
+      - LAVINMQ_URL=amqp://guest:guest@lavinmq:5672/
+    depends_on:
+      lavinmq:
+        condition: service_healthy
+    networks:
+      - bar-network
+
+networks:
+  bar-network:
+    driver: bridge
