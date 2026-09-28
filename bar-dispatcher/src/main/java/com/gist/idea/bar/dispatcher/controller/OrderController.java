@@ -1,21 +1,7 @@
 package com.gist.idea.bar.dispatcher.controller;
 
-import com.gist.idea.bar.common.amqp.AmqpTopology;
-import com.gist.idea.bar.common.event.*;
-import com.gist.idea.bar.common.model.IntentEnum;
-import com.gist.idea.bar.dispatcher.dto.IntentRequest;
-import com.gist.idea.bar.dispatcher.dto.OrderAcceptedResponse;
-import com.gist.idea.bar.dispatcher.service.IntentClassifierService;
-import com.gist.idea.bar.dispatcher.service.IntentClassifierService.MultiIntentResult;
-import com.gist.idea.bar.dispatcher.service.ResponseTrackerService;
-import jakarta.validation.Valid;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.amqp.rabbit.core.RabbitTemplate;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
-import org.springframework.web.context.request.async.DeferredResult;
+import static com.gist.idea.bar.dispatcher.controller.DeferredResultHelper.fromFuture;
+import static com.gist.idea.bar.dispatcher.controller.DeferredResultHelper.immediate;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -24,8 +10,31 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
-import static com.gist.idea.bar.dispatcher.controller.DeferredResultHelper.fromFuture;
-import static com.gist.idea.bar.dispatcher.controller.DeferredResultHelper.immediate;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.context.request.async.DeferredResult;
+
+import com.gist.idea.bar.common.amqp.AmqpTopology;
+import com.gist.idea.bar.common.event.CheckStatusIntentEvent;
+import com.gist.idea.bar.common.event.OrderDrinkIntentEvent;
+import com.gist.idea.bar.common.event.OrderFoodIntentEvent;
+import com.gist.idea.bar.common.event.OrderReadyEvent;
+import com.gist.idea.bar.common.event.OrderStatusReportedEvent;
+import com.gist.idea.bar.common.model.IntentEnum;
+import com.gist.idea.bar.dispatcher.dto.IntentRequest;
+import com.gist.idea.bar.dispatcher.dto.OrderAcceptedResponse;
+import com.gist.idea.bar.dispatcher.service.IntentClassifier;
+import com.gist.idea.bar.dispatcher.service.IntentClassifier.ClassificationResult;
+import com.gist.idea.bar.dispatcher.service.ResponseTrackerService;
+
+import jakarta.validation.Valid;
 
 @RestController
 @RequestMapping("/intent")
@@ -33,11 +42,11 @@ public class OrderController {
 
     private static final Logger log = LoggerFactory.getLogger(OrderController.class);
 
-    private final IntentClassifierService intentClassifier;
+    private final IntentClassifier intentClassifier;
     private final RabbitTemplate rabbitTemplate;
     private final ResponseTrackerService responseTracker;
 
-    public OrderController(IntentClassifierService intentClassifier,
+    public OrderController(IntentClassifier intentClassifier,
                            RabbitTemplate rabbitTemplate,
                            ResponseTrackerService responseTracker) {
         this.intentClassifier = intentClassifier;
@@ -49,7 +58,8 @@ public class OrderController {
     public DeferredResult<ResponseEntity<?>> handleIntent(@Valid @RequestBody IntentRequest request) {
         log.info("[Spike Entry] Ingested message: '{}'", request.message());
 
-        MultiIntentResult result = intentClassifier.classify(request.message());
+        ClassificationResult result = intentClassifier.classify(request.message());
+        log.info("[Spike Decision] Engine: '{}', Detected intents: {}", result.classifierSource(), result.detectedIntents());
 
         if (!result.hasIntents()) {
             log.warn("Jev detected no actionable intent for message: '{}'", request.message());

@@ -9,9 +9,10 @@ spring:
 
 # TypeSafe AI Jev Configuration
 jev:
+  enabled: ${JEV_ENABLED:false}
   api:
     url: ${JEV_API_URL:https://api.typesafe.ai/v1/systemone}
-    key: ${JEV_API_KEY:your-typesafe-api-key}
+    key: ${JEV_API_KEY:disabled}
     model: ${JEV_MODEL:jev-latest}
 
 logging:
