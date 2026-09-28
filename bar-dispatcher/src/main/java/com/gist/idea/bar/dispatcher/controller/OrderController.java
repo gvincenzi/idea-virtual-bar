@@ -25,7 +25,6 @@ import com.gist.idea.bar.common.amqp.AmqpTopology;
 import com.gist.idea.bar.common.event.CheckStatusIntentEvent;
 import com.gist.idea.bar.common.event.OrderDrinkIntentEvent;
 import com.gist.idea.bar.common.event.OrderFoodIntentEvent;
-import com.gist.idea.bar.common.event.OrderReadyEvent;
 import com.gist.idea.bar.common.event.OrderStatusReportedEvent;
 import com.gist.idea.bar.common.model.IntentEnum;
 import com.gist.idea.bar.common.model.OrderStatus;
