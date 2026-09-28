@@ -37,14 +37,30 @@ public class Order {
      * Called when a worker finishes: transitions the item to READY and recalculates total & status.
      */
     public synchronized void recordItemReady(String item, double price) {
-        this.items.put(item, ItemState.READY);
-        this.totalAmount += price;
+        ItemState previousState = this.items.put(item, ItemState.READY);
+        
+        // Add price only if the item was not already accounted for as READY
+        if (previousState != ItemState.READY) {
+            this.totalAmount += price;
+        }
+        
         this.status = checkOrderReady(this.items);
+    }
+    
+    /**
+     * Called when a worker reports a failure for an item.
+     */
+    public synchronized void recordItemFailed(String item) {
+        this.items.put(item, ItemState.FAILED);
+        this.status = OrderStatus.FAILED;
     }
 
     private static OrderStatus checkOrderReady(Map<String, ItemState> items) {
         if (items.isEmpty()) return OrderStatus.RECEIVED;
         for (Entry<String, ItemState> item : items.entrySet()) {
+            if (ItemState.FAILED.equals(item.getValue())) {
+                return OrderStatus.FAILED;
+            }
             if (!ItemState.READY.equals(item.getValue())) {
                 return OrderStatus.IN_PROGRESS;
             }

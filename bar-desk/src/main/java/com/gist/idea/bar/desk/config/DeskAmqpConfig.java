@@ -26,15 +26,15 @@ public class DeskAmqpConfig {
         return QueueBuilder.durable(AmqpTopology.QUEUE_DESK_EVENTS).build();
     }
 
-    // Binding 1: drinkReady and foodReady
+    // Binding 1: drinkReady, foodReady, itemFailed
     @Bean
-    public Binding deskEventsBinding(Queue deskEventsQueue, TopicExchange barExchange) {
+    public Binding deskWorkerEventsBinding(Queue deskEventsQueue, TopicExchange barExchange) {
         return BindingBuilder.bind(deskEventsQueue)
                 .to(barExchange)
-                .with(AmqpTopology.ROUTING_PATTERN_ALL_READY);
+                .with(AmqpTopology.ROUTING_PATTERN_ALL_EVENTS);
     }
 
-    // Binding 2: intent.orderDrink and intent.orderFood
+    // Binding 2: intent.orderDrink, intent.orderFood
     @Bean
     public Binding deskOrderIntentsBinding(Queue deskEventsQueue, TopicExchange barExchange) {
         return BindingBuilder.bind(deskEventsQueue)

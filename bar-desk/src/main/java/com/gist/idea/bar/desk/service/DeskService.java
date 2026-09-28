@@ -9,6 +9,7 @@ import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.stereotype.Service;
 
 import com.gist.idea.bar.common.amqp.AmqpTopology;
+import com.gist.idea.bar.common.event.OrderFailedEvent;
 import com.gist.idea.bar.common.event.OrderReadyEvent;
 import com.gist.idea.bar.common.event.OrderStatusReportedEvent;
 import com.gist.idea.bar.common.model.OrderStatus;
@@ -51,6 +52,17 @@ public class DeskService {
         Order order = orderRepository.findOrCreate(correlationId);
         order.recordItemReady(item, FOOD_PRICE_DEFAULT);
         checkAndEmitOrderReady(order);
+    }
+    
+    public void processItemFailed(UUID correlationId, String item, String reason) {
+        log.warn("[Desk] Recording Item FAILED: '{}' (reason: '{}') [correlationId: {}]", item, reason, correlationId);
+        Order order = orderRepository.findOrCreate(correlationId);
+        order.recordItemFailed(item);
+
+        // Immediate reactive failure notification towards the Spike
+        var failedEvent = new OrderFailedEvent(correlationId, item, reason);
+        rabbitTemplate.convertAndSend(AmqpTopology.BAR_EXCHANGE, AmqpTopology.ROUTING_EVENT_ORDER_FAILED, failedEvent);
+        log.info("[Desk] Emitted OrderFailedEvent for correlationId: {}", correlationId);
     }
     
     private void checkAndEmitOrderReady(Order order) {

@@ -3,6 +3,7 @@ package com.gist.idea.bar.desk.listener;
 import com.gist.idea.bar.common.amqp.AmqpTopology;
 import com.gist.idea.bar.common.event.DrinkReadyEvent;
 import com.gist.idea.bar.common.event.FoodReadyEvent;
+import com.gist.idea.bar.common.event.ItemFailedEvent;
 import com.gist.idea.bar.common.event.OrderDrinkIntentEvent;
 import com.gist.idea.bar.common.event.OrderFoodIntentEvent;
 import com.gist.idea.bar.desk.service.DeskService;
@@ -26,18 +27,26 @@ public class DeskEventListener {
         this.deskService = deskService;
     }
 
-    // From Binding 1: event.*Ready
+    // From Binding 1: event.drinkReady
     @RabbitHandler
     public void onDrinkReady(DrinkReadyEvent event) {
         log.info("[Desk Listener] Drink ready: '{}' [correlationId: {}]", event.item(), event.correlationId());
         deskService.processDrinkReady(event.correlationId(), event.item());
     }
 
-    // From Binding 1: event.*Ready
+    // From Binding 1: event.foodReady
     @RabbitHandler
     public void onFoodReady(FoodReadyEvent event) {
         log.info("[Desk Listener] Food ready: '{}' [correlationId: {}]", event.item(), event.correlationId());
         deskService.processFoodReady(event.correlationId(), event.item());
+    }
+    
+    // From Binding 1: event.itemFailed
+    @RabbitHandler 
+    public void onItemFailed(ItemFailedEvent event) {
+        log.warn("[Desk Listener] Item failed reported: '{}' by worker '{}' (reason: '{}') [correlationId: {}]",
+                event.item(), event.failedBy(), event.reason(), event.correlationId());
+        deskService.processItemFailed(event.correlationId(), event.item(), event.reason());
     }
     
     // From Binding 2: intent.order*
@@ -53,4 +62,5 @@ public class DeskEventListener {
         log.info("[Desk Listener] Food ordered: '{}' [correlationId: {}]", event.item(), event.correlationId());
         deskService.processItemOrdered(event.correlationId(), event.item());
     }
+    
 }

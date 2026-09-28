@@ -69,6 +69,21 @@ public class AmqpConfig {
     }
 
     /**
+     * Binds the order failed event routing key to the dispatcher response queue.
+     * Unblocks clients waiting on AWAIT_READY immediately if an item fails.
+     * 
+     * @param dispatcherResponseQueue the response queue bean
+     * @param barExchange the topic exchange bean
+     * @return the created Binding
+     */
+    @Bean
+    public Binding orderFailedBinding(Queue dispatcherResponseQueue, TopicExchange barExchange) {
+        return BindingBuilder.bind(dispatcherResponseQueue)
+                .to(barExchange)
+                .with(AmqpTopology.ROUTING_EVENT_ORDER_FAILED);
+    }
+
+    /**
      * Configures Jackson JSON converter for transparent serialization
      * and deserialization of Java records across AMQP queues.
      *

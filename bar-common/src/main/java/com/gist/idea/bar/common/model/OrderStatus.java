@@ -4,6 +4,7 @@ public enum OrderStatus {
     RECEIVED,
     IN_PROGRESS,
     READY,
+    FAILED,
     NOT_FOUND
 }
 
