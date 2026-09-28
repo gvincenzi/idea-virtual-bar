@@ -14,8 +14,8 @@
     <artifactId>bar-desk</artifactId>
     <packaging>jar</packaging>
 
-    <name>IDEA - Virtual Bar :: Desk (Cashier &amp; Read Model)</name>
-    <description>Molecule observability and cashier worker: aggregates events, handles queries and payments</description>
+    <name>IDEA - Virtual Bar :: Desk (Read Model)</name>
+    <description>Molecule observability: aggregates events and handles queries</description>
 
     <dependencies>
         <!-- Shared Domain Contracts -->
