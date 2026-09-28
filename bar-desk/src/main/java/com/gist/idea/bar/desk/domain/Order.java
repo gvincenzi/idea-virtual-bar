@@ -10,7 +10,8 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Bean tracking the end-to-end lifecycle of an order under a single Correlation ID.
+ * Order aggregate tracking item lifecycle.
+ * Immune to out-of-order event arrivals and duplicate deliveries.
  */
 public class Order {
 
@@ -26,46 +27,69 @@ public class Order {
     }
 
     /**
-     * Called when an intent is dispatched: registers the item as ORDERED.
+     * Registers an incoming order intent.
+     * If a ready or failed event arrived out-of-order BEFORE this intent,
+     * the existing state is preserved and NOT regressed.
      */
     public synchronized void recordItemOrdered(String item) {
-        this.items.putIfAbsent(item, ItemState.ORDERED);
-        this.status = OrderStatus.IN_PROGRESS;
+        items.compute(item, (key, currentState) -> {
+            if (currentState == null) {
+                return ItemState.ORDERED;
+            }
+            // State already exists (e.g. READY arrived early): do NOT regress to ORDERED
+            return currentState;
+        });
+        this.status = checkOrderReady(this.items);
     }
 
     /**
-     * Called when a worker finishes: transitions the item to READY and recalculates total & status.
+     * Transitions an item to READY.
+     * Idempotent on totalAmount calculation.
      */
     public synchronized void recordItemReady(String item, double price) {
-        ItemState previousState = this.items.put(item, ItemState.READY);
-        
-        // Add price only if the item was not already accounted for as READY
-        if (previousState != ItemState.READY) {
-            this.totalAmount += price;
-        }
-        
+        items.compute(item, (key, currentState) -> {
+            if (currentState == null || currentState.canTransitionTo(ItemState.READY)) {
+                if (currentState != ItemState.READY) {
+                    this.totalAmount += price; // Add price only on first transition to READY
+                }
+                return ItemState.READY;
+            }
+            return currentState;
+        });
         this.status = checkOrderReady(this.items);
     }
-    
+
     /**
-     * Called when a worker reports a failure for an item.
+     * Transitions an item to FAILED.
      */
     public synchronized void recordItemFailed(String item) {
-        this.items.put(item, ItemState.FAILED);
-        this.status = OrderStatus.FAILED;
+        items.compute(item, (key, currentState) -> {
+            if (currentState == null || currentState.canTransitionTo(ItemState.FAILED)) {
+                return ItemState.FAILED;
+            }
+            return currentState;
+        });
+        this.status = checkOrderReady(this.items);
     }
 
     private static OrderStatus checkOrderReady(Map<String, ItemState> items) {
         if (items.isEmpty()) return OrderStatus.RECEIVED;
-        for (Entry<String, ItemState> item : items.entrySet()) {
-            if (ItemState.FAILED.equals(item.getValue())) {
-                return OrderStatus.FAILED;
+
+        boolean hasFailures = false;
+        boolean allReady = true;
+
+        for (Entry<String, ItemState> entry : items.entrySet()) {
+            if (entry.getValue() == ItemState.FAILED) {
+                hasFailures = true;
             }
-            if (!ItemState.READY.equals(item.getValue())) {
-                return OrderStatus.IN_PROGRESS;
+            if (entry.getValue() != ItemState.READY) {
+                allReady = false;
             }
         }
-        return OrderStatus.READY;
+
+        if (hasFailures) return OrderStatus.FAILED;
+        if (allReady) return OrderStatus.READY;
+        return OrderStatus.IN_PROGRESS;
     }
 
     public UUID getCorrelationId() { return correlationId; }

@@ -8,26 +8,28 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 > **"One microservice = One business intent"**  
-> An exploratory Proof-of-Concept and architectural blueprint investigating intent-first routing and end-to-end traceability across event-driven microservices.
+> An exploratory Proof-of-Concept and reference laboratory investigating intent-first routing, compound fan-out, and closed-loop observability across event-driven microservices.
 
 ---
 
 ## 📖 Architectural Exploration & Scope
 
-This repository provides an experimental reference implementation exploring the architectural hypothesis formulated by [Giuseppe Vincenzi](https://www.linkedin.com/in/giuseppevincenzi/) (IT Process Architect) in the article:  
+This repository provides an experimental reference implementation exploring the architectural hypothesis formulated by [Giuseppe Vincenzi](https://www.linkedin.com/in/giuseppevincenzi/) (IT Process Architect) in:  
 👉 **[Intent-Driven Architecture: a microservice molecule driven by Business and Events](https://www.linkedin.com/pulse/intent-driven-architecture-microservice-molecule-driven-vincenzi-jzdhe/)**
 
-Rather than claiming an industry-wide standard, this project serves as a **working architectural laboratory** to address a specific distributed systems question:  
-*Can we treat natural language business intent as the sole public gateway of a microservice molecule, while keeping the resulting asynchronous workflows observable, measurable, and deterministic in production?*
+### The Core Question
+In distributed architectures, microservices are traditionally exposed via fragmented, resource-oriented endpoints (`/orders`, `/items`, `/payments`), leaving workflow orchestration to the client or heavy orchestrators.  
+This project investigates an alternative question:  
+*Can we treat natural language business intent as the sole public gateway of a microservice molecule, while keeping the resulting asynchronous workflows deterministic, observable, resilient to partial failures, and measurable in production?*
 
-The architecture bridges **Domain-Driven Design (DDD)** and **Event-Driven Architecture (EDA)** across **three foundational pillars**:
+The architecture synthesizes **Domain-Driven Design (DDD)**, **Event-Driven Architecture (EDA)**, and **CQRS** around **three foundational pillars**:
 
 1. **The Asynchronous Intent Distributor (The Spike / Alpha)**: A qualified single entry point that ingests natural language, evaluates business intents with low-latency classification (via TypeSafe AI Jev speculative fan-out or deterministic rule-based fallback), and dispatches discrete events to the broker.
 2. **End-to-End Correlation ID**: Every intent lifecycle is minted with a unique identifier that travels through every downstream queue, worker, and return event.
 3. **Observability & Closed-Loop Feedback**: A dedicated read-model service (`Desk-Service`) that tracks intermediate states, manages partial failures, and emits completion events to close the feedback loop.
 
-### Scope & Nature of this Project
-This project is an **architectural prototype and didactic blueprint**, not a turnkey enterprise package. Its purpose is to demonstrate structural patterns (intent-based fan-out, Correlation ID propagation, CQRS-style read-models, and reactive deferred completion) with minimal accidental complexity. Enterprise concerns such as distributed tracing (OpenTelemetry), API security, and Dead Letter Exchanges are discussed as architectural extension points.
+### Scope & Boundaries
+This project is an **architectural prototype and didactic blueprint**, not a turnkey enterprise package. Its purpose is to demonstrate structural patterns (intent-based fan-out, Correlation ID propagation, CQRS-style read-models, and reactive deferred completion) with minimal accidental complexity. Enterprise concerns such as distributed tracing (OpenTelemetry), API security, and persistent event stores are discussed as architectural extension points.
 
 ---
 
@@ -77,7 +79,36 @@ A common architectural trap in distributed systems is conflating **state inspect
 | **Domain State** | Inspects intermediate states (`IN_PROGRESS`, item-by-item breakdown) | Awaits terminal transition (`READY` or `FAILED`) |
 | **Resilience & Diagnostics** | Essential when an await times out, allowing operators or users to diagnose partial failures or bottlenecks. | Provides smooth, zero-polling client UX without burning CPU or network bandwidth. |
 
-By supporting both through natural language, the architecture ensures that the system is **transparent and inspectable at every stage of the lifecycle**, directly addressing the question of observability and controllability in distributed environments.
+By supporting both through natural language, the architecture ensures that the system is **transparent and inspectable at every stage of the lifecycle**, directly answering the question of observability and controllability in distributed environments.
+
+---
+
+## 🛡️ Distributed Consistency & Production Guarantees
+
+Distributed systems cannot rely on naive assumptions such as ordered message arrivals, crash-free instances, or network synchrony. The project addresses the core challenges of asynchronous event choreographies:
+
+### 1. Monotonic State Machine & Out-of-Order Delivery
+In real-world networks, a completion event (`event.drinkReady`) may arrive at the `Desk-Service` *before* the intent event (`intent.orderDrink`) due to thread preemption or network jitter.  
+- The `ItemState` enumeration defines a **strictly monotonic state machine** via `canTransitionTo(...)`.
+- The `Order` aggregate uses atomic `compute()` operations: if an item reaches `READY` ahead of time, a lagging `ORDERED` intent **never regresses the state**.
+- Transitions: `ORDERED` $\rightarrow$ `PREPARING` $\rightarrow$ `READY` $\leftarrow$ `FAILED` (supports retry/healing).
+
+### 2. Idempotency on At-Least-Once Delivery
+AMQP brokers guarantee at-least-once message delivery. Receiving duplicate events must not corrupt business aggregates:
+- `Order.recordItemReady(...)` updates item state idempotently.
+- Price accumulation checks previous states: the item price is added **only on the first legal transition to `READY`**, guaranteeing that duplicate messages produce no financial drift.
+
+### 3. Knowing When an Order Is Truly Complete
+The `Desk-Service` binds to `intent.order*` to register all items in the lifecycle tracker upon intent ingestion.  
+When evaluations occur, `checkOrderReady()` evaluates all registered items: an order only transitions from `IN_PROGRESS` to `READY` when **every declared item** satisfies the `READY` predicate and no item is in `FAILED`.
+
+### 4. Persistence & State Storage Boundaries
+To keep this laboratory lightweight and runnable in under 30 seconds without external database setup, order aggregates are backed by a thread-safe in-memory store (`ConcurrentHashMap`).  
+In an enterprise deployment, this repository is replaced by an **Event Sourced store** or a distributed document database (PostgreSQL / MongoDB) keyed on the `correlationId`.
+
+### 5. Horizontal Scalability of Reactive Long-Polls
+In a multi-instance deployment of `bar-dispatcher` behind a load balancer, client connections are held on specific pods.  
+To deliver `OrderReadyEvent` to the exact pod holding the `DeferredResult`, the production topology uses a **Fanout Exchange** (or Redis Pub/Sub) across dispatcher instances, or assigns **pod-exclusive anonymous queues** bound to the correlation exchange. The current single-replica setup demonstrates the end-to-end event bridge cleanly while remaining horizontally extensible.
 
 ---
 
