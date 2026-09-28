@@ -18,12 +18,10 @@ public class Order {
     private final UUID correlationId;
     private final Map<String, ItemState> items = new ConcurrentHashMap<>();
     private OrderStatus status;
-    private double totalAmount;
 
     public Order(UUID correlationId) {
         this.correlationId = correlationId;
         this.status = OrderStatus.RECEIVED;
-        this.totalAmount = 0.0;
     }
 
     /**
@@ -44,14 +42,10 @@ public class Order {
 
     /**
      * Transitions an item to READY.
-     * Idempotent on totalAmount calculation.
      */
-    public synchronized void recordItemReady(String item, double price) {
+    public synchronized void recordItemReady(String item) {
         items.compute(item, (key, currentState) -> {
             if (currentState == null || currentState.canTransitionTo(ItemState.READY)) {
-                if (currentState != ItemState.READY) {
-                    this.totalAmount += price; // Add price only on first transition to READY
-                }
                 return ItemState.READY;
             }
             return currentState;
@@ -95,5 +89,4 @@ public class Order {
     public UUID getCorrelationId() { return correlationId; }
     public Map<String, ItemState> getItems() { return Collections.unmodifiableMap(items); }
     public OrderStatus getStatus() { return status; }
-    public double getTotalAmount() { return totalAmount; }
 }

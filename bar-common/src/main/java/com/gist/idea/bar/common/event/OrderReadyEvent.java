@@ -8,12 +8,11 @@ import java.util.UUID;
  */
 public record OrderReadyEvent(
     UUID correlationId,
-    double totalAmount,
     Instant timestamp
 ) implements DomainEvent {
 
-    public OrderReadyEvent(UUID correlationId, double totalAmount) {
-        this(correlationId, totalAmount, Instant.now());
+    public OrderReadyEvent(UUID correlationId) {
+        this(correlationId, Instant.now());
     }
 
     @Override

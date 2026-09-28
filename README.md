@@ -63,8 +63,9 @@ Depending on the classified intent, the gateway dynamically activates one of the
    - Queries the aggregated materialized view in the `Desk-Service`.
    - Returns an immediate snapshot of the order's internal progression (e.g. `cappuccino: READY, croissant: ORDERED -> IN_PROGRESS`).
 3. **Reactive Long-Poll / Completion Notification (`AWAIT_READY`)**:
-   - Suspends the incoming HTTP connection in a non-blocking fashion (`DeferredResult`).
-   - Unblocks reactively when the `Desk-Service` evaluates that *all* items have completed (`OrderReadyEvent`) or when an item fails (`OrderFailedEvent`).
+   - Executes a non-blocking pre-flight check to verify if the order is already in a terminal state (`READY` or `FAILED`).
+   - If in progress, suspends the incoming HTTP connection using Spring MVC `DeferredResult`.
+   - Unblocks reactively when the `Desk-Service` evaluates that *all* items have completed (`OrderReadyEvent`) or when an item fails (`OrderFailedEvent`), returning the same unified `OrderStatusReportedEvent` schema as `CHECK_STATUS`.
 
 ---
 
@@ -95,8 +96,8 @@ In real-world networks, a completion event (`event.drinkReady`) may arrive at th
 
 ### 2. Idempotency on At-Least-Once Delivery
 AMQP brokers guarantee at-least-once message delivery. Receiving duplicate events must not corrupt business aggregates:
-- `Order.recordItemReady(...)` updates item state idempotently.
-- Price accumulation checks previous states: the item price is added **only on the first legal transition to `READY`**, guaranteeing that duplicate messages produce no financial drift.
+- `Order.recordItemReady(...)` updates item state idempotently through `Map.compute()`.
+- Duplicate completion events for an item already marked `READY` produce no state mutation or side effects.
 
 ### 3. Knowing When an Order Is Truly Complete
 The `Desk-Service` binds to `intent.order*` to register all items in the lifecycle tracker upon intent ingestion.  
@@ -223,7 +224,7 @@ Rather than using a slow generative LLM, the Dispatcher integrates **TypeSafe AI
 
 ## 🛠️ Technology Stack
 
-- **Language**: Java 21 LTS (Generational ZGC enabled)
+- **Language & Runtime**: Java 21 LTS (Generational ZGC enabled)
 - **Framework**: Spring Boot 3.5.5
 - **Message Broker**: [LavinMQ](https://lavinmq.com/) (AMQP 0-9-1 cloud instance or local container)
 - **Primary Intent Classifier**: [TypeSafe AI Jev (System One Model)](https://api.typesafe.ai)
@@ -281,15 +282,49 @@ export JEV_API_KEY="your-typesafe-jev-api-key"
 ```bash
 curl -X POST http://localhost:8080/intent -H "Content-Type: application/json" -d "{\"message\": \"I would like a cappuccino and a croissant\"}"
 ```
+**Response (`202 Accepted`)**:
+```json
+{
+  "correlationId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+  "status": "RECEIVED",
+  "dispatchedIntents": ["ORDER_DRINK", "ORDER_FOOD"],
+  "timestamp": "2026-09-28T14:30:00Z"
+}
+```
 
 ### 2. Point-in-Time Snapshot (Read-Path)
 ```bash
-curl -X POST http://localhost:8080/intent -H "Content-Type: application/json" -d "{\"message\": \"What is the status of my order?\", \"correlationId\": \"YOUR-UUID\"}"
+curl -X POST http://localhost:8080/intent -H "Content-Type: application/json" -d "{\"message\": \"What is the status of my order?\", \"correlationId\": \"3fa85f64-5717-4562-b3fc-2c963f66afa6\"}"
+```
+**Response (`200 OK`)**:
+```json
+{
+  "correlationId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+  "status": "IN_PROGRESS",
+  "items": {
+    "cappuccino": "READY",
+    "croissant": "ORDERED"
+  },
+  "timestamp": "2026-09-28T14:30:02Z"
+}
 ```
 
 ### 3. Reactive Completion Notification (Long-Poll Stream)
 ```bash
-curl -X POST http://localhost:8080/intent -H "Content-Type: application/json" -d "{\"message\": \"Please notify me when everything is ready\", \"correlationId\": \"YOUR-UUID\"}"
+curl -X POST http://localhost:8080/intent -H "Content-Type: application/json" -d "{\"message\": \"Please notify me when everything is ready\", \"correlationId\": \"3fa85f64-5717-4562-b3fc-2c963f66afa6\"}"
+```
+*(The HTTP connection waits non-blockingly until all items are ready, returning the exact same unified schema)*:  
+**Response (`200 OK`)**:
+```json
+{
+  "correlationId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+  "status": "READY",
+  "items": {
+    "cappuccino": "READY",
+    "croissant": "READY"
+  },
+  "timestamp": "2026-09-28T14:30:04Z"
+}
 ```
 
 ---
